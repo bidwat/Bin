@@ -2,6 +2,7 @@ import type { Database } from '@bin/supabase';
 
 import { getAuthenticatedRouteContext } from '@/lib/auth';
 import { jsonResponse, optionsResponse } from '@/lib/api-response';
+import { updateProfileSchema } from '@/lib/validation';
 
 export async function GET(request: Request) {
   const { client: supabase, user } =
@@ -36,20 +37,22 @@ export async function PATCH(request: Request) {
     return jsonResponse(request, { error: 'Unauthorized' }, { status: 401 });
   }
 
-  const payload = (await request.json().catch(() => null)) as {
-    timezone?: string;
-    auto_create_reminders?: boolean;
-    auto_create_events?: boolean;
-    push_token?: string | null;
-  } | null;
+  const parsedPayload = updateProfileSchema.safeParse(
+    await request.json().catch(() => null),
+  );
 
-  if (!payload) {
-    return jsonResponse(request, { error: 'Invalid payload' }, { status: 400 });
+  if (!parsedPayload.success) {
+    return jsonResponse(
+      request,
+      { error: parsedPayload.error.issues[0]?.message ?? 'Invalid payload' },
+      { status: 422 },
+    );
   }
 
   const updates: Database['public']['Tables']['users']['Update'] = {
     updated_at: new Date().toISOString(),
   };
+  const payload = parsedPayload.data;
 
   if (typeof payload.timezone === 'string' && payload.timezone.trim()) {
     updates.timezone = payload.timezone.trim();

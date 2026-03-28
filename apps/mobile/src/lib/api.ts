@@ -93,6 +93,59 @@ export async function deleteItem(id: string) {
   }
 }
 
+export async function fetchItem(id: string) {
+  const userId = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from('items')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? 'Failed to load item');
+  }
+
+  return { item: mapItemRow(data) };
+}
+
+export async function updateItem(
+  id: string,
+  updates: Partial<
+    Pick<Item, 'cleanedText' | 'type' | 'actionability' | 'reminderAt'>
+  >,
+) {
+  const userId = await getCurrentUserId();
+  const payload: Database['public']['Tables']['items']['Update'] = {};
+
+  if ('cleanedText' in updates) {
+    payload.cleaned_text = updates.cleanedText ?? null;
+  }
+  if ('type' in updates) {
+    payload.type = updates.type ?? null;
+  }
+  if ('actionability' in updates) {
+    payload.actionability = updates.actionability ?? null;
+  }
+  if ('reminderAt' in updates) {
+    payload.reminder_at = updates.reminderAt ?? null;
+  }
+
+  const { data, error } = await supabase
+    .from('items')
+    .update(payload)
+    .eq('id', id)
+    .eq('user_id', userId)
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? 'Failed to update item');
+  }
+
+  return { item: mapItemRow(data) };
+}
+
 export async function fetchProfile() {
   const userId = await getCurrentUserId();
   const { data, error } = await supabase

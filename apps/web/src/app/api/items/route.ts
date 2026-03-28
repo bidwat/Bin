@@ -3,6 +3,7 @@ import type { Database } from '@bin/supabase';
 import { getAuthenticatedRouteContext } from '@/lib/auth';
 import { jsonResponse, optionsResponse } from '@/lib/api-response';
 import { mapItemRow } from '@/lib/items';
+import { createItemSchema, listItemsSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   const { client: supabase, user } =
@@ -12,22 +13,24 @@ export async function POST(request: Request) {
     return jsonResponse(request, { error: 'Unauthorized' }, { status: 401 });
   }
 
-  const payload = (await request.json().catch(() => null)) as {
-    text?: string;
-  } | null;
-  const text = payload?.text?.trim();
+  const parsedPayload = createItemSchema.safeParse(
+    await request.json().catch(() => null),
+  );
 
-  if (!text) {
+  if (!parsedPayload.success) {
     return jsonResponse(
       request,
-      { error: 'Text is required' },
-      { status: 400 },
+      {
+        error:
+          parsedPayload.error.issues[0]?.message ?? 'Invalid capture payload',
+      },
+      { status: 422 },
     );
   }
 
   const insertPayload: Database['public']['Tables']['items']['Insert'] = {
     user_id: user.id,
-    raw_input: text,
+    raw_input: parsedPayload.data.rawInput,
     source: 'manual',
   };
 
@@ -59,10 +62,22 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const limit = Math.min(Number(searchParams.get('limit') ?? '50') || 50, 100);
-  const cursor = searchParams.get('cursor');
-  const type = searchParams.get('type');
-  const actionability = searchParams.get('actionability');
+  const parsedQuery = listItemsSchema.safeParse({
+    limit: searchParams.get('limit') ?? undefined,
+    cursor: searchParams.get('cursor') ?? undefined,
+    type: searchParams.get('type') ?? undefined,
+    actionability: searchParams.get('actionability') ?? undefined,
+  });
+
+  if (!parsedQuery.success) {
+    return jsonResponse(
+      request,
+      { error: parsedQuery.error.issues[0]?.message ?? 'Invalid query' },
+      { status: 422 },
+    );
+  }
+
+  const { limit, cursor, type, actionability } = parsedQuery.data;
 
   let query = supabase
     .from('items')

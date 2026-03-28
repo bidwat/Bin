@@ -7,9 +7,10 @@ import type { Item } from '@bin/shared';
 type ItemCardProps = {
   item: Item;
   onDelete?: (id: string) => Promise<void>;
+  onOpen?: (id: string) => void;
 };
 
-export function ItemCard({ item, onDelete }: ItemCardProps) {
+export function ItemCard({ item, onDelete, onOpen }: ItemCardProps) {
   const optimistic = item.id.startsWith('optimistic-');
   const body = item.cleanedText?.trim() || item.rawInput;
 
@@ -41,7 +42,7 @@ export function ItemCard({ item, onDelete }: ItemCardProps) {
         {onDelete ? (
           <button
             type="button"
-            onClick={() => onDelete(item.id)}
+            onClick={() => void onDelete(item.id)}
             className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
           >
             Delete
@@ -49,9 +50,15 @@ export function ItemCard({ item, onDelete }: ItemCardProps) {
         ) : null}
       </div>
 
-      <p className="mt-4 whitespace-pre-wrap text-base leading-7 text-slate-900">
-        {body}
-      </p>
+      <button
+        type="button"
+        onClick={() => onOpen?.(item.id)}
+        className="mt-4 block w-full text-left"
+      >
+        <p className="whitespace-pre-wrap text-base leading-7 text-slate-900">
+          {body}
+        </p>
+      </button>
 
       <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
         <span>

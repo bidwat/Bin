@@ -1,0 +1,12 @@
+appId: host.exp.exponent
+---
+- launchApp
+- assertVisible: "Expo Go"
+- tapOn: "Enter URL manually"
+- inputText: "exp://expo.dev/@local/bin"
+- tapOn: "Connect"
+- assertVisible: "Feed"
+- tapOn: "+"
+- inputText: "Buy milk"
+- tapOn: "Capture"
+- assertVisible: "Buy milk"

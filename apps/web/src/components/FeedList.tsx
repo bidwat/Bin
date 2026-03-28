@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import type { Item } from '@bin/shared';
 
 import { CaptureBar } from '@/components/CaptureBar';
+import { ItemDetailSheet } from '@/components/ItemDetailSheet';
 import { ItemCard } from '@/components/ItemCard';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
@@ -14,7 +16,31 @@ type FeedListProps = {
 };
 
 export function FeedList({ initialItems, userId }: FeedListProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [items, setItems] = useState(initialItems);
+  const selectedItemId = searchParams.get('item');
+  const selectedItem = items.find((item) => item.id === selectedItemId) ?? null;
+
+  function openItem(id: string) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('item', id);
+    router.push(`${pathname}?${nextParams.toString()}`, { scroll: false });
+  }
+
+  function closeItem() {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete('item');
+    const query = nextParams.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  function replaceItem(updatedItem: Item) {
+    setItems((current) =>
+      current.map((item) => (item.id === updatedItem.id ? updatedItem : item)),
+    );
+  }
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -194,10 +220,23 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
           </div>
         ) : (
           items.map((item) => (
-            <ItemCard key={item.id} item={item} onDelete={handleDelete} />
+            <ItemCard
+              key={item.id}
+              item={item}
+              onDelete={handleDelete}
+              onOpen={openItem}
+            />
           ))
         )}
       </div>
+
+      {selectedItem ? (
+        <ItemDetailSheet
+          item={selectedItem}
+          onClose={closeItem}
+          onSave={replaceItem}
+        />
+      ) : null}
     </div>
   );
 }

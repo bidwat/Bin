@@ -7,6 +7,7 @@ import {
   optionsResponse,
 } from '@/lib/api-response';
 import { mapItemRow } from '@/lib/items';
+import { updateItemSchema } from '@/lib/validation';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -43,18 +44,20 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const payload = (await request.json().catch(() => null)) as {
-    cleaned_text?: string | null;
-    type?: Database['public']['Enums']['item_type'] | null;
-    actionability?: Database['public']['Enums']['actionability'] | null;
-    reminder_at?: string | null;
-  } | null;
+  const parsedPayload = updateItemSchema.safeParse(
+    await request.json().catch(() => null),
+  );
 
-  if (!payload) {
-    return jsonResponse(request, { error: 'Invalid payload' }, { status: 400 });
+  if (!parsedPayload.success) {
+    return jsonResponse(
+      request,
+      { error: parsedPayload.error.issues[0]?.message ?? 'Invalid payload' },
+      { status: 422 },
+    );
   }
 
   const updates: Database['public']['Tables']['items']['Update'] = {};
+  const payload = parsedPayload.data;
 
   if ('cleaned_text' in payload)
     updates.cleaned_text = payload.cleaned_text ?? null;

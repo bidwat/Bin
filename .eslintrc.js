@@ -11,5 +11,12 @@ module.exports = {
     'plugin:@typescript-eslint/recommended',
     'prettier',
   ],
-  ignorePatterns: ['dist/', 'node_modules/', '.next/', '.expo/', 'coverage/'],
+  ignorePatterns: [
+    'dist/',
+    'node_modules/',
+    '.next/',
+    '.expo/',
+    'coverage/',
+    '**/next-env.d.ts',
+  ],
 };

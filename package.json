@@ -13,6 +13,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
+    "test": "vitest run",
     "type-check": "turbo run type-check",
     "format": "prettier --write .",
     "prepare": "husky",
@@ -25,21 +26,28 @@
     "*.{js,cjs,mjs,ts,tsx,json,md}": [
       "prettier --write"
     ],
-    "*.{js,cjs,mjs,ts,tsx}": [
+    "!(*next-env.d).{js,cjs,mjs,ts,tsx}": [
       "eslint --max-warnings=0"
     ]
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jsdom": "^28.0.1",
     "@types/node": "^22.15.21",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
+    "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.2",
     "husky": "^9.1.7",
+    "jsdom": "^29.0.1",
     "lint-staged": "^15.5.0",
     "prettier": "^3.5.3",
     "supabase": "^2.84.4",
     "turbo": "^2.5.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.2"
   }
 }

@@ -1,6 +1,14 @@
+import { useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import type { Item } from '@bin/shared';
 
@@ -11,25 +19,81 @@ export function ItemCard({
   item: Item;
   onDelete: (id: string) => void;
 }) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const maxReveal = -108;
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dx) > Math.abs(gestureState.dy) &&
+        Math.abs(gestureState.dx) > 8,
+      onPanResponderMove: (_, gestureState) => {
+        const next = Math.max(maxReveal, Math.min(0, gestureState.dx));
+        translateX.setValue(next);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const shouldOpen = gestureState.dx < -48;
+        Animated.spring(translateX, {
+          toValue: shouldOpen ? maxReveal : 0,
+          useNativeDriver: true,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+    }),
+  ).current;
+
+  function closeActions() {
+    Animated.spring(translateX, {
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
+  }
+
   return (
     <View style={styles.cardShell}>
-      <Link href={`/(app)/item/${item.id}`} asChild>
-        <Pressable style={styles.card}>
-          <View style={styles.badges}>
-            <Text style={styles.source}>{item.source}</Text>
-            {item.type ? <Text style={styles.type}>{item.type}</Text> : null}
-          </View>
-          <Text style={styles.body}>
-            {item.cleanedText?.trim() || item.rawInput}
-          </Text>
-          <Text style={styles.meta}>
-            {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
-          </Text>
+      <View style={styles.deleteTray}>
+        <Pressable
+          style={styles.deleteAction}
+          onPress={() => {
+            closeActions();
+            onDelete(item.id);
+          }}
+        >
+          <Text style={styles.deleteText}>Delete</Text>
         </Pressable>
-      </Link>
-      <Pressable style={styles.deleteAction} onPress={() => onDelete(item.id)}>
-        <Text style={styles.deleteText}>Delete</Text>
-      </Pressable>
+      </View>
+
+      <Animated.View
+        style={[styles.cardWrapper, { transform: [{ translateX }] }]}
+        {...panResponder.panHandlers}
+      >
+        <Link href={`/(app)/item/${item.id}`} asChild>
+          <Pressable
+            style={styles.card}
+            onPress={() => {
+              closeActions();
+            }}
+          >
+            <View style={styles.badges}>
+              <Text style={styles.source}>{item.source}</Text>
+              {item.type ? <Text style={styles.type}>{item.type}</Text> : null}
+            </View>
+            <Text style={styles.body}>
+              {item.cleanedText?.trim() || item.rawInput}
+            </Text>
+            <Text style={styles.meta}>
+              {formatDistanceToNow(new Date(item.createdAt), {
+                addSuffix: true,
+              })}
+            </Text>
+            <Text style={styles.swipeHint}>Swipe left for delete</Text>
+          </Pressable>
+        </Link>
+      </Animated.View>
     </View>
   );
 }
@@ -37,7 +101,15 @@ export function ItemCard({
 const styles = StyleSheet.create({
   cardShell: {
     marginBottom: 12,
-    gap: 10,
+    position: 'relative',
+  },
+  deleteTray: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  cardWrapper: {
+    zIndex: 1,
   },
   card: {
     backgroundColor: '#ffffff',
@@ -79,15 +151,18 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontSize: 12,
   },
+  swipeHint: {
+    color: '#94a3b8',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
   deleteAction: {
     backgroundColor: '#dc2626',
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'flex-end',
-    minWidth: 96,
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    width: 108,
+    borderRadius: 24,
   },
   deleteText: {
     color: '#ffffff',

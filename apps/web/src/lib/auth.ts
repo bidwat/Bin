@@ -1,13 +1,16 @@
 import { createTokenSupabaseClient } from '@bin/supabase';
 import type { Database } from '@bin/supabase';
-import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { getPublicEnv } from '@/lib/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
+type RouteSupabaseClient = Awaited<
+  ReturnType<typeof createSupabaseServerClient>
+>;
+
 type AuthenticatedRouteContext = {
   accessToken: string | null;
-  client: SupabaseClient<Database>;
+  client: RouteSupabaseClient;
   user: { id: string; email: string | null } | null;
 };
 
@@ -23,7 +26,7 @@ export async function getAuthenticatedRouteContext(
       env.supabaseUrl,
       env.supabasePublishableKey,
       accessToken,
-    );
+    ) as unknown as RouteSupabaseClient;
     const {
       data: { user },
     } = await client.auth.getUser(accessToken);
