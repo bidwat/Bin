@@ -3,6 +3,7 @@ dist/
 .next/
 .turbo/
 .husky/_/
+.expo/
 *.tsbuildinfo
 package-lock.json
 .env
