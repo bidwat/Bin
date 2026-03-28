@@ -1,0 +1,16 @@
+{
+  "name": "@bin/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "node --watch src/index.ts",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@bin/shared": "workspace:*",
+    "@bin/supabase": "workspace:*"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "name": "bin",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "format": "prettier --write .",
+    "prepare": "husky",
+    "gen:types": "supabase gen types typescript --workdir packages/supabase --local > packages/supabase/src/database.types.ts",
+    "supabase:start": "supabase start --workdir packages/supabase",
+    "supabase:stop": "supabase stop --workdir packages/supabase",
+    "supabase:db:push": "supabase db push --workdir packages/supabase"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,ts,tsx,json,md}": [
+      "prettier --write"
+    ],
+    "*.{js,cjs,mjs,ts,tsx}": [
+      "eslint --max-warnings=0"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^10.1.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.0",
+    "prettier": "^3.5.3",
+    "supabase": "^2.84.4",
+    "turbo": "^2.5.0",
+    "typescript": "^5.8.3"
+  }
+}
