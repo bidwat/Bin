@@ -19,7 +19,7 @@
     "gen:types": "supabase gen types typescript --workdir packages/supabase --local > packages/supabase/src/database.types.ts",
     "supabase:start": "supabase start --workdir packages/supabase",
     "supabase:stop": "supabase stop --workdir packages/supabase",
-    "supabase:db:push": "supabase db push --workdir packages/supabase"
+    "supabase:db:push": "supabase db push --local --workdir packages/supabase"
   },
   "lint-staged": {
     "*.{js,cjs,mjs,ts,tsx,json,md}": [
