@@ -40,6 +40,16 @@ export function createTokenSupabaseClient(
   });
 }
 
+export function createAdminSupabaseClient(url: string, key: string) {
+  return createBaseClient<Database>(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
 export function createServerSupabaseClient(
   url: string,
   key: string,
