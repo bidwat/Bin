@@ -1,7 +1,9 @@
 node_modules/
 dist/
+.next/
 .turbo/
 .husky/_/
+*.tsbuildinfo
 package-lock.json
 .env
 .env.*

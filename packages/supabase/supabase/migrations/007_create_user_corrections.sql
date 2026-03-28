@@ -1,5 +1,5 @@
 create table if not exists public.user_corrections (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   user_id uuid not null references public.users(id) on delete cascade,
   item_id uuid not null references public.items(id) on delete cascade,
   original_classification jsonb not null,

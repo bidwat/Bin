@@ -1,5 +1,5 @@
 create or replace function public.match_items(
-  query_embedding vector(1536),
+  query_embedding extensions.vector(1536),
   match_user_id uuid,
   match_threshold float default 0.7,
   match_count int default 20

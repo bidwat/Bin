@@ -1,7 +1,7 @@
 create type public.memory_source as enum ('onboarding', 'inferred');
 
 create table if not exists public.user_memory (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   user_id uuid not null references public.users(id) on delete cascade,
   statement text not null,
   confidence_score float not null default 0.5,

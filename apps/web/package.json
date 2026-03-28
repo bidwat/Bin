@@ -3,14 +3,27 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "dev": "node --watch src/index.ts",
-    "lint": "eslint src --ext .ts",
-    "type-check": "tsc -p tsconfig.json --noEmit",
-    "start": "node dist/index.js"
+    "build": "next build --webpack",
+    "dev": "next dev",
+    "dev:host": "next dev --hostname 0.0.0.0",
+    "lint": "eslint src --ext .ts,.tsx",
+    "start": "next start",
+    "type-check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@bin/shared": "workspace:*",
-    "@bin/supabase": "workspace:*"
+    "@bin/supabase": "workspace:*",
+    "date-fns": "^4.1.0",
+    "next": "^15.5.6",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.14",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.14"
   }
 }

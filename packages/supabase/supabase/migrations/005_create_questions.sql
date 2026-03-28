@@ -1,7 +1,7 @@
 create type public.question_status as enum ('pending', 'answered', 'dismissed');
 
 create table if not exists public.questions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default extensions.uuid_generate_v4(),
   item_id uuid not null references public.items(id) on delete cascade,
   question text not null,
   confidence_score float not null default 0.5,
