@@ -74,6 +74,7 @@ export async function processItem(itemId: string) {
     env.supabaseUrl,
     env.supabaseSecretKey,
   );
+  console.info('processItem started', { itemId });
 
   const item = await fetchItemOrThrow(supabase, itemId);
 
@@ -89,6 +90,12 @@ export async function processItem(itemId: string) {
     item.raw_input,
     userMemoryStatements,
   );
+  console.info('processItem classified item', {
+    itemId,
+    type: classification.type,
+    actionability: classification.actionability,
+    hasReminderAt: Boolean(classification.reminder_at),
+  });
   const embedding = await embedText(
     classification.cleaned_text || item.raw_input,
   );
@@ -115,6 +122,7 @@ export async function processItem(itemId: string) {
     throw new ProcessItemError('Failed to update processed item', 500);
   }
 
+  console.info('processItem completed', { itemId, processed: data.processed });
   return mapItemRow(data);
 }
 
