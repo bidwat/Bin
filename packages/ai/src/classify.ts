@@ -60,7 +60,6 @@ export async function classifyItem(rawInput: string, userMemory: string[]) {
     try {
       const response = await client.chat.completions.create({
         model: 'gpt-5-nano',
-        temperature: 0,
         response_format: { type: 'json_object' },
         messages: buildMessages(rawInput, userMemory, attempt > 0),
       });
