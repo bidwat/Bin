@@ -1,5 +1,4 @@
 import { classifyItem, embedText } from '@bin/ai';
-import type { Item } from '@bin/shared';
 import { createAdminSupabaseClient } from '@bin/supabase';
 import type { Database, Json } from '@bin/supabase';
 
@@ -23,19 +22,26 @@ function serializeEmbedding(embedding: number[]) {
   return `[${embedding.join(',')}]`;
 }
 
-function normalizeEntities(entities: Item['entities']) {
-  return {
-    people: entities.people ?? [],
-    dates: entities.dates ?? [],
-    places: entities.places ?? [],
-    urls: entities.urls ?? [],
-    times: entities.times ?? [],
-    companies: entities.companies ?? [],
-  } satisfies Json;
+function normalizeEntities(entities: Record<string, unknown>) {
+  const normalized: Record<string, unknown> = {
+    ...entities,
+    people: Array.isArray(entities.people) ? entities.people : [],
+    dates: Array.isArray(entities.dates) ? entities.dates : [],
+    places: Array.isArray(entities.places) ? entities.places : [],
+    urls: Array.isArray(entities.urls) ? entities.urls : [],
+    times: Array.isArray(entities.times) ? entities.times : [],
+    companies: Array.isArray(entities.companies) ? entities.companies : [],
+  };
+
+  if (typeof entities.attachment_url === 'string') {
+    normalized.attachment_url = entities.attachment_url;
+  }
+
+  return normalized as Json;
 }
 
 function mergeEntityMaps(
-  existingEntities: Item['entities'],
+  existingEntities: Record<string, unknown>,
   classifiedEntities: {
     people: string[];
     dates: string[];
@@ -45,26 +51,39 @@ function mergeEntityMaps(
 ) {
   const unique = (values: string[]) => Array.from(new Set(values));
 
-  return {
+  const merged: Record<string, unknown> = {
+    ...existingEntities,
     people: unique([
-      ...(existingEntities.people ?? []),
+      ...(Array.isArray(existingEntities.people)
+        ? existingEntities.people
+        : []),
       ...classifiedEntities.people,
     ]),
     dates: unique([
-      ...(existingEntities.dates ?? []),
+      ...(Array.isArray(existingEntities.dates) ? existingEntities.dates : []),
       ...classifiedEntities.dates,
     ]),
     places: unique([
-      ...(existingEntities.places ?? []),
+      ...(Array.isArray(existingEntities.places)
+        ? existingEntities.places
+        : []),
       ...classifiedEntities.places,
     ]),
     urls: unique([
-      ...(existingEntities.urls ?? []),
+      ...(Array.isArray(existingEntities.urls) ? existingEntities.urls : []),
       ...classifiedEntities.urls,
     ]),
-    times: existingEntities.times ?? [],
-    companies: existingEntities.companies ?? [],
-  } satisfies Item['entities'];
+    times: Array.isArray(existingEntities.times) ? existingEntities.times : [],
+    companies: Array.isArray(existingEntities.companies)
+      ? existingEntities.companies
+      : [],
+  };
+
+  if (typeof existingEntities.attachment_url === 'string') {
+    merged.attachment_url = existingEntities.attachment_url;
+  }
+
+  return merged;
 }
 
 async function fetchItemOrThrow(supabase: AdminClient, itemId: string) {
@@ -136,7 +155,14 @@ export async function processItem(itemId: string) {
     type: classification.type,
     actionability: classification.actionability,
     entities: normalizeEntities(
-      mergeEntityMaps(mapItemRow(item).entities, classification.entities),
+      mergeEntityMaps(
+        item.entities &&
+          typeof item.entities === 'object' &&
+          !Array.isArray(item.entities)
+          ? (item.entities as Record<string, unknown>)
+          : {},
+        classification.entities,
+      ),
     ),
     embedding: serializeEmbedding(embedding),
     processed: true,

@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.yourcompany.bin",
-      "permissions": ["RECORD_AUDIO"]
+      "permissions": ["RECORD_AUDIO", "CAMERA"]
     },
     "plugins": [
       "expo-router",
@@ -16,6 +16,13 @@
         "expo-av",
         {
           "microphonePermission": "Allow Bin to record voice captures."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Bin to import images into your feed.",
+          "cameraPermission": "Allow Bin to capture photos into your feed."
         }
       ]
     ],

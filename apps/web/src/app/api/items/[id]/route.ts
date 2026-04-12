@@ -6,6 +6,7 @@ import {
   jsonResponse,
   optionsResponse,
 } from '@/lib/api-response';
+import { isUuid } from '@/lib/ids';
 import { mapItemRow } from '@/lib/items';
 import { updateItemSchema } from '@/lib/validation';
 
@@ -22,6 +23,10 @@ export async function DELETE(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  if (!isUuid(id)) {
+    return jsonResponse(request, { error: 'Invalid item id' }, { status: 422 });
+  }
+
   const { error } = await supabase
     .from('items')
     .delete()
@@ -44,6 +49,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  if (!isUuid(id)) {
+    return jsonResponse(request, { error: 'Invalid item id' }, { status: 422 });
+  }
+
   const parsedPayload = updateItemSchema.safeParse(
     await request.json().catch(() => null),
   );

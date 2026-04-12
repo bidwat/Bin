@@ -4,14 +4,20 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { Item } from '@bin/shared';
 
+import { ImageCaptureButton } from '@/components/ImageCaptureButton';
 import { VoiceCaptureButton } from '@/components/VoiceCaptureButton';
 
 type CaptureBarProps = {
   onCapture: (text: string) => Promise<void>;
   onVoiceCaptured?: (item: Item) => void;
+  onImageCaptured?: (item: Item) => void;
 };
 
-export function CaptureBar({ onCapture, onVoiceCaptured }: CaptureBarProps) {
+export function CaptureBar({
+  onCapture,
+  onVoiceCaptured,
+  onImageCaptured,
+}: CaptureBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +102,14 @@ export function CaptureBar({ onCapture, onVoiceCaptured }: CaptureBarProps) {
                 onCreated={(item) => {
                   onVoiceCaptured(item);
                   setToast('Voice captured');
+                }}
+              />
+            ) : null}
+            {onImageCaptured ? (
+              <ImageCaptureButton
+                onCreated={(item) => {
+                  onImageCaptured(item);
+                  setToast('Image captured');
                 }}
               />
             ) : null}

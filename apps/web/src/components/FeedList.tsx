@@ -205,7 +205,7 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
     ]);
   }
 
-  function handleVoiceCaptured(item: Item) {
+  function handleCreatedItem(item: Item) {
     setItems((current) => [
       item,
       ...current.filter((entry) => entry.id !== item.id),
@@ -229,7 +229,8 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
     <div className="space-y-6">
       <CaptureBar
         onCapture={handleCapture}
-        onVoiceCaptured={handleVoiceCaptured}
+        onVoiceCaptured={handleCreatedItem}
+        onImageCaptured={handleCreatedItem}
       />
 
       <div className="flex gap-2 overflow-x-auto pb-2">

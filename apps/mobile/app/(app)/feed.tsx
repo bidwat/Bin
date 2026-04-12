@@ -21,6 +21,27 @@ export default function FeedScreen() {
   const [selectedType, setSelectedType] = useState<Item['type']>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  function buildPendingItem(source: 'voice' | 'image', message: string): Item {
+    return {
+      id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      userId: 'pending',
+      rawInput: message,
+      cleanedText: null,
+      source,
+      type: null,
+      actionability: null,
+      entities: {},
+      clusterIds: [],
+      subClusterId: null,
+      resurfacingScore: 1,
+      processed: false,
+      reminderStatus: null,
+      reminderAt: null,
+      createdAt: new Date().toISOString(),
+      lastSurfacedAt: null,
+    };
+  }
+
   const loadItems = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -109,6 +130,25 @@ export default function FeedScreen() {
         onCapture={async (text) => {
           const { item } = await createItem(text);
           setItems((current) => [item, ...current]);
+        }}
+        onAsyncCaptureStart={(source, label) => {
+          const pendingItem = buildPendingItem(source, label);
+          setItems((current) => [pendingItem, ...current]);
+          return pendingItem.id;
+        }}
+        onAsyncCaptureResolved={(pendingId, item) => {
+          setItems((current) => [
+            item,
+            ...current.filter(
+              (entry) => entry.id !== pendingId && entry.id !== item.id,
+            ),
+          ]);
+        }}
+        onAsyncCaptureRejected={(pendingId) => {
+          setItems((current) =>
+            current.filter((entry) => entry.id !== pendingId),
+          );
+          void loadItems();
         }}
       />
     </View>

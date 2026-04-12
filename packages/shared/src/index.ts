@@ -35,6 +35,7 @@ export interface EntityMap {
   places?: string[];
   urls?: string[];
   companies?: string[];
+  attachment_url?: string;
 }
 
 export interface Item {

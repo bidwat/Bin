@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,7 @@ import {
 import { Actionability, ItemType, type Item } from '@bin/shared';
 
 import { fetchItem, updateItem } from '../../../src/lib/api';
+import { getAttachmentUrl } from '../../../src/lib/attachments';
 
 export default function ItemDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -23,6 +25,9 @@ export default function ItemDetailScreen() {
     useState<Item['actionability']>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const attachmentUrl = item
+    ? getAttachmentUrl(item.entities.attachment_url)
+    : null;
 
   useEffect(() => {
     if (!params.id) {
@@ -79,6 +84,13 @@ export default function ItemDetailScreen() {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Original input</Text>
+        {attachmentUrl ? (
+          <Image
+            source={{ uri: attachmentUrl }}
+            style={styles.attachment}
+            resizeMode="cover"
+          />
+        ) : null}
         <Text style={styles.body}>{item?.rawInput ?? 'Loading...'}</Text>
       </View>
 
@@ -182,6 +194,13 @@ const styles = StyleSheet.create({
     color: '#475569',
     fontSize: 16,
     lineHeight: 24,
+  },
+  attachment: {
+    width: '100%',
+    height: 260,
+    borderRadius: 20,
+    marginBottom: 12,
+    backgroundColor: '#e2e8f0',
   },
   card: {
     backgroundColor: '#ffffff',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -8,17 +8,31 @@ import {
   View,
 } from 'react-native';
 
+import type { Item } from '@bin/shared';
+
+import { ImageCaptureButton } from './ImageCaptureButton';
 import { VoiceCaptureButton } from './VoiceCaptureButton';
 
 export function CaptureBar({
   onCapture,
+  onAsyncCaptureStart,
+  onAsyncCaptureResolved,
+  onAsyncCaptureRejected,
 }: {
   onCapture: (text: string) => Promise<void>;
+  onAsyncCaptureStart?: (
+    source: 'voice' | 'image',
+    label: string,
+  ) => string | null;
+  onAsyncCaptureResolved?: (pendingId: string, item: Item) => void;
+  onAsyncCaptureRejected?: (pendingId: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const pendingVoiceIdRef = useRef<string | null>(null);
+  const pendingImageIdRef = useRef<string | null>(null);
 
   async function submit() {
     if (!value.trim() || isSaving) return;
@@ -75,9 +89,53 @@ export function CaptureBar({
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <View style={styles.actions}>
               <VoiceCaptureButton
-                onTranscript={(transcript) => {
+                onProcessingStart={() => {
                   setError(null);
-                  setValue(transcript);
+                  setIsOpen(false);
+                  pendingVoiceIdRef.current =
+                    onAsyncCaptureStart?.('voice', 'Transcribing entry') ??
+                    null;
+                }}
+                onCreated={(item) => {
+                  const pendingId = pendingVoiceIdRef.current;
+                  pendingVoiceIdRef.current = null;
+
+                  if (pendingId && onAsyncCaptureResolved) {
+                    onAsyncCaptureResolved(pendingId, item);
+                  }
+                }}
+                onError={() => {
+                  const pendingId = pendingVoiceIdRef.current;
+                  pendingVoiceIdRef.current = null;
+
+                  if (pendingId && onAsyncCaptureRejected) {
+                    onAsyncCaptureRejected(pendingId);
+                  }
+                }}
+              />
+              <ImageCaptureButton
+                onProcessingStart={() => {
+                  setError(null);
+                  setIsOpen(false);
+                  pendingImageIdRef.current =
+                    onAsyncCaptureStart?.('image', 'Processing image entry') ??
+                    null;
+                }}
+                onCreated={(item) => {
+                  const pendingId = pendingImageIdRef.current;
+                  pendingImageIdRef.current = null;
+
+                  if (pendingId && onAsyncCaptureResolved) {
+                    onAsyncCaptureResolved(pendingId, item);
+                  }
+                }}
+                onError={() => {
+                  const pendingId = pendingImageIdRef.current;
+                  pendingImageIdRef.current = null;
+
+                  if (pendingId && onAsyncCaptureRejected) {
+                    onAsyncCaptureRejected(pendingId);
+                  }
                 }}
               />
               <Pressable

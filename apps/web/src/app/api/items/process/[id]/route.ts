@@ -1,5 +1,6 @@
 import { jsonResponse } from '@/lib/api-response';
 import { getAuthenticatedRouteContext } from '@/lib/auth';
+import { isUuid } from '@/lib/ids';
 import {
   getProcessableItemForUser,
   ProcessItemError,
@@ -21,6 +22,14 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const { id } = await context.params;
+    if (!isUuid(id)) {
+      return jsonResponse(
+        request,
+        { error: 'Invalid item id' },
+        { status: 422 },
+      );
+    }
+
     const item = await getProcessableItemForUser(id, user.id);
 
     if (item.processed) {

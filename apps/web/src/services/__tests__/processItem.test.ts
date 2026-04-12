@@ -161,6 +161,62 @@ describe('processItem', () => {
     expect(result.reminderAt).toBe('2026-03-29T19:00:00');
   });
 
+  it('preserves attachment_url while adding AI entities', async () => {
+    classifyItem.mockResolvedValue({
+      cleaned_text: 'Screenshot of a flight confirmation for Austin tomorrow.',
+      type: 'reference',
+      actionability: 'soon',
+      entities: {
+        people: [],
+        dates: ['tomorrow'],
+        places: ['Austin'],
+        urls: [],
+      },
+      reminder_at: null,
+      confidence: 0.88,
+    });
+    embedText.mockResolvedValue([0.4, 0.5, 0.6]);
+    createAdminSupabaseClient.mockReturnValue(
+      createAdminClient({
+        itemRow: {
+          ...itemRow,
+          source: 'image',
+          raw_input: 'Flight screenshot',
+          entities: {
+            attachment_url: 'item-attachments/user-1/example.jpg',
+          },
+        },
+        updatedRow: {
+          ...itemRow,
+          source: 'image',
+          raw_input: 'Flight screenshot',
+          cleaned_text:
+            'Screenshot of a flight confirmation for Austin tomorrow.',
+          type: 'reference',
+          actionability: 'soon',
+          entities: {
+            attachment_url: 'item-attachments/user-1/example.jpg',
+            people: [],
+            dates: ['tomorrow'],
+            places: ['Austin'],
+            urls: [],
+            times: [],
+            companies: [],
+          },
+          embedding: '[0.4,0.5,0.6]',
+          processed: true,
+        },
+      }),
+    );
+
+    const result = await processItem('item-1');
+
+    expect(result.entities.attachment_url).toBe(
+      'item-attachments/user-1/example.jpg',
+    );
+    expect(result.entities.places).toEqual(['Austin']);
+  });
+
   it('leaves the item unprocessed when classification fails', async () => {
     classifyItem.mockRejectedValue(new Error('boom'));
     createAdminSupabaseClient.mockReturnValue(createAdminClient({ itemRow }));

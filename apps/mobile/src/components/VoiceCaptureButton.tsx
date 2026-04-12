@@ -2,13 +2,21 @@ import { Audio } from 'expo-av';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { transcribeVoiceCapture } from '../lib/api';
+import type { Item } from '@bin/shared';
+
+import { createVoiceItem } from '../lib/api';
 
 type VoiceCaptureButtonProps = {
-  onTranscript: (transcript: string) => void;
+  onCreated: (item: Item) => void;
+  onProcessingStart?: () => void;
+  onError?: () => void;
 };
 
-export function VoiceCaptureButton({ onTranscript }: VoiceCaptureButtonProps) {
+export function VoiceCaptureButton({
+  onCreated,
+  onProcessingStart,
+  onError,
+}: VoiceCaptureButtonProps) {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -60,9 +68,11 @@ export function VoiceCaptureButton({ onTranscript }: VoiceCaptureButtonProps) {
         throw new Error('Recording failed to save');
       }
 
-      const transcript = await transcribeVoiceCapture(uri, 'audio/mp4');
-      onTranscript(transcript);
+      onProcessingStart?.();
+      const item = await createVoiceItem(uri, 'audio/mp4');
+      onCreated(item);
     } catch (recordingError) {
+      onError?.();
       setError(
         recordingError instanceof Error
           ? recordingError.message

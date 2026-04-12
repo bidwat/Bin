@@ -4,6 +4,8 @@ import { useState } from 'react';
 
 import { Actionability, ItemType, type Item } from '@bin/shared';
 
+import { getAttachmentUrl } from '@/lib/attachments';
+
 type ItemDetailSheetProps = {
   item: Item;
   onClose: () => void;
@@ -15,6 +17,7 @@ export function ItemDetailSheet({
   onClose,
   onSave,
 }: ItemDetailSheetProps) {
+  const attachmentUrl = getAttachmentUrl(item.entities.attachment_url);
   const [cleanedText, setCleanedText] = useState(
     item.cleanedText ?? item.rawInput,
   );
@@ -89,6 +92,13 @@ export function ItemDetailSheet({
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
               Original capture
             </p>
+            {attachmentUrl ? (
+              <img
+                src={attachmentUrl}
+                alt="Captured attachment"
+                className="mt-4 h-72 w-full rounded-[1.5rem] object-cover"
+              />
+            ) : null}
             <p className="mt-3 whitespace-pre-wrap text-base leading-7 text-slate-900">
               {item.rawInput}
             </p>

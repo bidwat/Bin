@@ -1,5 +1,6 @@
 export { getOpenAIClient } from './client';
 export { classifyItem, classificationSchema } from './classify';
+export { describeImage } from './describe-image';
 export { embedText } from './embed';
 export { AiError } from './errors';
 export { CLASSIFY_PROMPT } from './prompts/classify';

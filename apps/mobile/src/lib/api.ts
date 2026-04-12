@@ -5,6 +5,15 @@ import { Platform } from 'react-native';
 import { getMobileEnv } from './env';
 import { supabase } from './supabase';
 
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function assertUuid(id: string) {
+  if (!uuidPattern.test(id)) {
+    throw new Error('Invalid item id');
+  }
+}
+
 export type UserProfile = Database['public']['Tables']['users']['Row'];
 type ItemRow = Database['public']['Tables']['items']['Row'];
 
@@ -149,7 +158,85 @@ export async function transcribeVoiceCapture(
   return payload.transcript;
 }
 
+export async function createVoiceItem(uri: string, mimeType = 'audio/mp4') {
+  const formData = new FormData();
+  formData.append('source', 'voice');
+
+  if (Platform.OS === 'web') {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    formData.append(
+      'audio',
+      new File([blob], 'capture.webm', {
+        type: blob.type || mimeType,
+      }),
+    );
+  } else {
+    formData.append('audio', {
+      uri,
+      name: 'capture.m4a',
+      type: mimeType,
+    } as unknown as Blob);
+  }
+
+  const response = await fetch(`${getMobileEnv().apiBaseUrl}/api/items/voice`, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body: formData,
+  });
+
+  const payload = (await response.json().catch(() => null)) as {
+    item?: Item;
+    error?: string;
+  } | null;
+
+  if (!response.ok || !payload?.item) {
+    throw new Error(payload?.error ?? 'Voice capture failed');
+  }
+
+  return payload.item;
+}
+
+export async function createImageItem(uri: string, mimeType = 'image/jpeg') {
+  const formData = new FormData();
+
+  if (Platform.OS === 'web') {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    formData.append(
+      'image',
+      new File([blob], 'capture.jpg', {
+        type: blob.type || mimeType,
+      }),
+    );
+  } else {
+    formData.append('image', {
+      uri,
+      name: 'capture.jpg',
+      type: mimeType,
+    } as unknown as Blob);
+  }
+
+  const response = await fetch(`${getMobileEnv().apiBaseUrl}/api/items/image`, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body: formData,
+  });
+
+  const payload = (await response.json().catch(() => null)) as {
+    item?: Item;
+    error?: string;
+  } | null;
+
+  if (!response.ok || !payload?.item) {
+    throw new Error(payload?.error ?? 'Image capture failed');
+  }
+
+  return payload.item;
+}
+
 export async function deleteItem(id: string) {
+  assertUuid(id);
   const userId = await getCurrentUserId();
   const { error } = await supabase
     .from('items')
@@ -163,6 +250,7 @@ export async function deleteItem(id: string) {
 }
 
 export async function fetchItem(id: string) {
+  assertUuid(id);
   const userId = await getCurrentUserId();
   const { data, error } = await supabase
     .from('items')
@@ -184,6 +272,7 @@ export async function updateItem(
     Pick<Item, 'cleanedText' | 'type' | 'actionability' | 'reminderAt'>
   >,
 ) {
+  assertUuid(id);
   const userId = await getCurrentUserId();
   const payload: Database['public']['Tables']['items']['Update'] = {};
 

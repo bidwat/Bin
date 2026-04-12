@@ -2,7 +2,9 @@
 
 import { formatDistanceToNow } from 'date-fns';
 
-import type { Item } from '@bin/shared';
+import { Actionability, ItemType, type Item } from '@bin/shared';
+
+import { getAttachmentUrl } from '@/lib/attachments';
 
 type ItemCardProps = {
   item: Item;
@@ -13,6 +15,13 @@ type ItemCardProps = {
 export function ItemCard({ item, onDelete, onOpen }: ItemCardProps) {
   const optimistic = item.id.startsWith('optimistic-');
   const body = item.cleanedText?.trim() || item.rawInput;
+  const attachmentUrl = getAttachmentUrl(item.entities.attachment_url);
+  const entityPills = [
+    ...(item.entities.people ?? []),
+    ...(item.entities.dates ?? []),
+    ...(item.entities.places ?? []),
+    ...(item.entities.urls ?? []),
+  ].slice(0, 4);
 
   return (
     <article
@@ -28,13 +37,26 @@ export function ItemCard({ item, onDelete, onOpen }: ItemCardProps) {
             {item.source}
           </span>
           {item.type ? (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${typeBadgeClassName(item.type)}`}
+            >
               {item.type}
+            </span>
+          ) : null}
+          {item.actionability ? (
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${actionabilityBadgeClassName(item.actionability)}`}
+            >
+              {item.actionability}
             </span>
           ) : null}
           {optimistic ? (
             <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-medium text-amber-950">
               Capturing
+            </span>
+          ) : !item.processed ? (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900">
+              Processing
             </span>
           ) : null}
         </div>
@@ -52,12 +74,35 @@ export function ItemCard({ item, onDelete, onOpen }: ItemCardProps) {
 
       <button
         type="button"
-        onClick={() => onOpen?.(item.id)}
+        onClick={() => {
+          if (!optimistic) {
+            onOpen?.(item.id);
+          }
+        }}
         className="mt-4 block w-full text-left"
       >
+        {attachmentUrl ? (
+          <img
+            src={attachmentUrl}
+            alt="Captured attachment"
+            className="mb-4 h-56 w-full rounded-[1.25rem] object-cover"
+          />
+        ) : null}
         <p className="whitespace-pre-wrap text-base leading-7 text-slate-900">
           {body}
         </p>
+        {entityPills.length > 0 ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {entityPills.map((pill) => (
+              <span
+                key={pill}
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600"
+              >
+                {pill}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </button>
 
       <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
@@ -68,4 +113,38 @@ export function ItemCard({ item, onDelete, onOpen }: ItemCardProps) {
       </div>
     </article>
   );
+}
+
+function typeBadgeClassName(type: ItemType) {
+  switch (type) {
+    case ItemType.Task:
+      return 'bg-sky-100 text-sky-900';
+    case ItemType.Reminder:
+      return 'bg-rose-100 text-rose-900';
+    case ItemType.Idea:
+      return 'bg-amber-100 text-amber-900';
+    case ItemType.Person:
+      return 'bg-emerald-100 text-emerald-900';
+    case ItemType.Event:
+      return 'bg-violet-100 text-violet-900';
+    case ItemType.Reference:
+      return 'bg-orange-100 text-orange-900';
+    case ItemType.Note:
+    default:
+      return 'bg-slate-100 text-slate-700';
+  }
+}
+
+function actionabilityBadgeClassName(actionability: Actionability) {
+  switch (actionability) {
+    case Actionability.Now:
+      return 'bg-rose-100 text-rose-900';
+    case Actionability.Soon:
+      return 'bg-amber-100 text-amber-900';
+    case Actionability.Eventually:
+      return 'bg-sky-100 text-sky-900';
+    case Actionability.Never:
+    default:
+      return 'bg-slate-100 text-slate-700';
+  }
 }
