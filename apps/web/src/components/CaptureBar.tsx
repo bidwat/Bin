@@ -2,11 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import type { Item } from '@bin/shared';
+
+import { VoiceCaptureButton } from '@/components/VoiceCaptureButton';
+
 type CaptureBarProps = {
   onCapture: (text: string) => Promise<void>;
+  onVoiceCaptured?: (item: Item) => void;
 };
 
-export function CaptureBar({ onCapture }: CaptureBarProps) {
+export function CaptureBar({ onCapture, onVoiceCaptured }: CaptureBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -76,11 +81,23 @@ export function CaptureBar({ onCapture }: CaptureBarProps) {
         />
 
         <div className="flex items-center justify-between gap-4">
-          <div className="text-sm text-slate-500">
-            Cmd/Ctrl + Enter to capture
-            {error ? <span className="ml-3 text-rose-600">{error}</span> : null}
-            {toast ? (
-              <span className="ml-3 text-emerald-700">{toast}</span>
+          <div className="flex items-center gap-4 text-sm text-slate-500">
+            <span>
+              Cmd/Ctrl + Enter to capture
+              {error ? (
+                <span className="ml-3 text-rose-600">{error}</span>
+              ) : null}
+              {toast ? (
+                <span className="ml-3 text-emerald-700">{toast}</span>
+              ) : null}
+            </span>
+            {onVoiceCaptured ? (
+              <VoiceCaptureButton
+                onCreated={(item) => {
+                  onVoiceCaptured(item);
+                  setToast('Voice captured');
+                }}
+              />
             ) : null}
           </div>
 

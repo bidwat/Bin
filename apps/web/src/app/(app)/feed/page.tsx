@@ -1,18 +1,37 @@
+import { ItemType } from '@bin/shared';
+
 import { FeedList } from '@/components/FeedList';
 import { mapItemRow } from '@/lib/items';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-export default async function FeedPage() {
+type FeedPageProps = {
+  searchParams?: Promise<{
+    type?: string;
+  }>;
+};
+
+export default async function FeedPage({ searchParams }: FeedPageProps) {
   const supabase = await createSupabaseServerClient();
+  const params = (await searchParams) ?? {};
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data, error } = await supabase
+  const selectedType = Object.values(ItemType).includes(params.type as ItemType)
+    ? (params.type as ItemType)
+    : null;
+
+  let query = supabase
     .from('items')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(50);
+
+  if (selectedType) {
+    query = query.eq('type', selectedType);
+  }
+
+  const { data, error } = await query;
 
   if (!user) {
     return null;

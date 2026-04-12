@@ -52,3 +52,7 @@ export const updateProfileSchema = z
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field is required',
   });
+
+export const createUrlItemSchema = z.object({
+  url: z.string().trim().url(),
+});

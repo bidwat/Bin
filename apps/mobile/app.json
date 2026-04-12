@@ -7,9 +7,18 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
-      "package": "com.yourcompany.bin"
+      "package": "com.yourcompany.bin",
+      "permissions": ["RECORD_AUDIO"]
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow Bin to record voice captures."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     }

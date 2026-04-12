@@ -8,6 +8,8 @@ import {
   View,
 } from 'react-native';
 
+import { VoiceCaptureButton } from './VoiceCaptureButton';
+
 export function CaptureBar({
   onCapture,
 }: {
@@ -72,6 +74,12 @@ export function CaptureBar({
             />
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <View style={styles.actions}>
+              <VoiceCaptureButton
+                onTranscript={(transcript) => {
+                  setError(null);
+                  setValue(transcript);
+                }}
+              />
               <Pressable
                 style={[styles.button, styles.secondaryButton]}
                 onPress={() => setIsOpen(false)}

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
-import type { Item } from '@bin/shared';
+import { ItemType, type Item } from '@bin/shared';
 
 import { CaptureBar } from '@/components/CaptureBar';
 import { ItemDetailSheet } from '@/components/ItemDetailSheet';
@@ -21,7 +21,75 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
   const searchParams = useSearchParams();
   const [items, setItems] = useState(initialItems);
   const selectedItemId = searchParams.get('item');
+  const selectedType = Object.values(ItemType).includes(
+    searchParams.get('type') as ItemType,
+  )
+    ? (searchParams.get('type') as ItemType)
+    : null;
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null;
+  const visibleItems = useMemo(
+    () =>
+      selectedType ? items.filter((item) => item.type === selectedType) : items,
+    [items, selectedType],
+  );
+
+  useEffect(() => {
+    setItems(initialItems);
+  }, [initialItems]);
+
+  function mapRealtimeItem(row: Record<string, unknown>) {
+    const createdAt =
+      typeof row.created_at === 'string'
+        ? row.created_at
+        : new Date().toISOString();
+
+    return {
+      id: String(row.id),
+      userId: String(row.user_id),
+      rawInput: String(row.raw_input),
+      cleanedText:
+        typeof row.cleaned_text === 'string' ? row.cleaned_text : null,
+      source: String(row.source ?? 'manual'),
+      type: typeof row.type === 'string' ? (row.type as Item['type']) : null,
+      actionability:
+        typeof row.actionability === 'string'
+          ? (row.actionability as Item['actionability'])
+          : null,
+      entities:
+        row.entities && typeof row.entities === 'object'
+          ? (row.entities as Item['entities'])
+          : {},
+      clusterIds: Array.isArray(row.cluster_ids)
+        ? row.cluster_ids.map(String)
+        : [],
+      subClusterId:
+        typeof row.sub_cluster_id === 'string' ? row.sub_cluster_id : null,
+      resurfacingScore:
+        typeof row.resurfacing_score === 'number' ? row.resurfacing_score : 1,
+      processed: Boolean(row.processed),
+      reminderStatus:
+        typeof row.reminder_status === 'string'
+          ? (row.reminder_status as Item['reminderStatus'])
+          : null,
+      reminderAt: typeof row.reminder_at === 'string' ? row.reminder_at : null,
+      createdAt,
+      lastSurfacedAt:
+        typeof row.last_surfaced_at === 'string' ? row.last_surfaced_at : null,
+    } satisfies Item;
+  }
+
+  function setTypeFilter(nextType: ItemType | null) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    if (nextType) {
+      nextParams.set('type', nextType);
+    } else {
+      nextParams.delete('type');
+    }
+
+    const query = nextParams.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
 
   function openItem(id: string) {
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -55,11 +123,6 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          const createdAt =
-            typeof payload.new.created_at === 'string'
-              ? payload.new.created_at
-              : new Date().toISOString();
-
           setItems((current) => {
             const withoutOptimistic = current.filter(
               (item) =>
@@ -69,58 +132,23 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
                 ),
             );
 
-            return [
-              {
-                id: String(payload.new.id),
-                userId: String(payload.new.user_id),
-                rawInput: String(payload.new.raw_input),
-                cleanedText:
-                  typeof payload.new.cleaned_text === 'string'
-                    ? payload.new.cleaned_text
-                    : null,
-                source: String(payload.new.source ?? 'manual'),
-                type:
-                  typeof payload.new.type === 'string'
-                    ? (payload.new.type as Item['type'])
-                    : null,
-                actionability:
-                  typeof payload.new.actionability === 'string'
-                    ? (payload.new.actionability as Item['actionability'])
-                    : null,
-                entities:
-                  payload.new.entities &&
-                  typeof payload.new.entities === 'object'
-                    ? (payload.new.entities as Item['entities'])
-                    : {},
-                clusterIds: Array.isArray(payload.new.cluster_ids)
-                  ? payload.new.cluster_ids.map(String)
-                  : [],
-                subClusterId:
-                  typeof payload.new.sub_cluster_id === 'string'
-                    ? payload.new.sub_cluster_id
-                    : null,
-                resurfacingScore:
-                  typeof payload.new.resurfacing_score === 'number'
-                    ? payload.new.resurfacing_score
-                    : 1,
-                processed: Boolean(payload.new.processed),
-                reminderStatus:
-                  typeof payload.new.reminder_status === 'string'
-                    ? (payload.new.reminder_status as Item['reminderStatus'])
-                    : null,
-                reminderAt:
-                  typeof payload.new.reminder_at === 'string'
-                    ? payload.new.reminder_at
-                    : null,
-                createdAt,
-                lastSurfacedAt:
-                  typeof payload.new.last_surfaced_at === 'string'
-                    ? payload.new.last_surfaced_at
-                    : null,
-              },
-              ...withoutOptimistic,
-            ];
+            return [mapRealtimeItem(payload.new), ...withoutOptimistic];
           });
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'items',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const nextItem = mapRealtimeItem(payload.new);
+          setItems((current) =>
+            current.map((item) => (item.id === nextItem.id ? nextItem : item)),
+          );
         },
       )
       .subscribe();
@@ -177,6 +205,13 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
     ]);
   }
 
+  function handleVoiceCaptured(item: Item) {
+    setItems((current) => [
+      item,
+      ...current.filter((entry) => entry.id !== item.id),
+    ]);
+  }
+
   async function handleDelete(id: string) {
     const previousItems = items;
     setItems((current) => current.filter((item) => item.id !== id));
@@ -192,34 +227,34 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
 
   return (
     <div className="space-y-6">
-      <CaptureBar onCapture={handleCapture} />
+      <CaptureBar
+        onCapture={handleCapture}
+        onVoiceCaptured={handleVoiceCaptured}
+      />
 
       <div className="flex gap-2 overflow-x-auto pb-2">
-        {[
-          'All',
-          'Ideas',
-          'Tasks',
-          'People',
-          'Reminders',
-          'Events',
-          'References',
-        ].map((label) => (
-          <span
-            key={label}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600"
-          >
-            {label}
-          </span>
+        <FilterChip
+          active={selectedType === null}
+          label="All"
+          onClick={() => setTypeFilter(null)}
+        />
+        {Object.values(ItemType).map((value) => (
+          <FilterChip
+            key={value}
+            active={selectedType === value}
+            label={`${value[0]?.toUpperCase()}${value.slice(1)}`}
+            onClick={() => setTypeFilter(value)}
+          />
         ))}
       </div>
 
       <div className="space-y-4">
-        {items.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white/60 p-10 text-center text-slate-500">
             Nothing captured yet.
           </div>
         ) : (
-          items.map((item) => (
+          visibleItems.map((item) => (
             <ItemCard
               key={item.id}
               item={item}
@@ -238,5 +273,29 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
         />
       ) : null}
     </div>
+  );
+}
+
+function FilterChip({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+        active
+          ? 'border-slate-950 bg-slate-950 text-white'
+          : 'border-slate-200 bg-white text-slate-600'
+      }`}
+    >
+      {label}
+    </button>
   );
 }

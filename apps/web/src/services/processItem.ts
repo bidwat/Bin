@@ -1,4 +1,5 @@
 import { classifyItem, embedText } from '@bin/ai';
+import type { Item } from '@bin/shared';
 import { createAdminSupabaseClient } from '@bin/supabase';
 import type { Database, Json } from '@bin/supabase';
 
@@ -22,18 +23,48 @@ function serializeEmbedding(embedding: number[]) {
   return `[${embedding.join(',')}]`;
 }
 
-function normalizeEntities(entities: {
-  people: string[];
-  dates: string[];
-  places: string[];
-  urls: string[];
-}) {
+function normalizeEntities(entities: Item['entities']) {
   return {
-    people: entities.people,
-    dates: entities.dates,
-    places: entities.places,
-    urls: entities.urls,
+    people: entities.people ?? [],
+    dates: entities.dates ?? [],
+    places: entities.places ?? [],
+    urls: entities.urls ?? [],
+    times: entities.times ?? [],
+    companies: entities.companies ?? [],
   } satisfies Json;
+}
+
+function mergeEntityMaps(
+  existingEntities: Item['entities'],
+  classifiedEntities: {
+    people: string[];
+    dates: string[];
+    places: string[];
+    urls: string[];
+  },
+) {
+  const unique = (values: string[]) => Array.from(new Set(values));
+
+  return {
+    people: unique([
+      ...(existingEntities.people ?? []),
+      ...classifiedEntities.people,
+    ]),
+    dates: unique([
+      ...(existingEntities.dates ?? []),
+      ...classifiedEntities.dates,
+    ]),
+    places: unique([
+      ...(existingEntities.places ?? []),
+      ...classifiedEntities.places,
+    ]),
+    urls: unique([
+      ...(existingEntities.urls ?? []),
+      ...classifiedEntities.urls,
+    ]),
+    times: existingEntities.times ?? [],
+    companies: existingEntities.companies ?? [],
+  } satisfies Item['entities'];
 }
 
 async function fetchItemOrThrow(supabase: AdminClient, itemId: string) {
@@ -104,7 +135,9 @@ export async function processItem(itemId: string) {
     cleaned_text: classification.cleaned_text,
     type: classification.type,
     actionability: classification.actionability,
-    entities: normalizeEntities(classification.entities),
+    entities: normalizeEntities(
+      mergeEntityMaps(mapItemRow(item).entities, classification.entities),
+    ),
     embedding: serializeEmbedding(embedding),
     processed: true,
     reminder_at: classification.reminder_at,

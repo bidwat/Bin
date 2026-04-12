@@ -6,6 +6,8 @@ import {
   processItem,
 } from '@/services/processItem';
 
+export const dynamic = 'force-dynamic';
+
 type RouteContext = {
   params: Promise<{ id: string }>;
 };

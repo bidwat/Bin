@@ -11,6 +11,10 @@ export function getOpenAIClient(apiKey = process.env.OPENAI_API_KEY) {
     });
   }
 
-  client ??= new OpenAI({ apiKey });
+  client ??= new OpenAI({
+    apiKey,
+    maxRetries: 2,
+    timeout: 45_000,
+  });
   return client;
 }

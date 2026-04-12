@@ -1,6 +1,8 @@
 import type { Item } from '@bin/shared';
 import type { Database } from '@bin/supabase';
+import { Platform } from 'react-native';
 
+import { getMobileEnv } from './env';
 import { supabase } from './supabase';
 
 export type UserProfile = Database['public']['Tables']['users']['Row'];
@@ -44,12 +46,36 @@ async function getCurrentUserId() {
   return session.user.id;
 }
 
-export async function fetchItems() {
-  const { data, error } = await supabase
+async function getAccessToken() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    throw new Error('No authenticated session');
+  }
+
+  return session.access_token;
+}
+
+async function getAuthHeaders() {
+  return {
+    Authorization: `Bearer ${await getAccessToken()}`,
+  };
+}
+
+export async function fetchItems(type?: Item['type'] | null) {
+  let query = supabase
     .from('items')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(50);
+
+  if (type) {
+    query = query.eq('type', type);
+  }
+
+  const { data, error } = await query;
 
   if (error || !data) {
     throw new Error(error?.message ?? 'Failed to load items');
@@ -78,6 +104,49 @@ export async function createItem(text: string) {
   }
 
   return { item: mapItemRow(data) };
+}
+
+export async function transcribeVoiceCapture(
+  uri: string,
+  mimeType = 'audio/mp4',
+) {
+  const formData = new FormData();
+  formData.append('mode', 'preview');
+  formData.append('source', 'voice');
+
+  if (Platform.OS === 'web') {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    formData.append(
+      'audio',
+      new File([blob], 'capture.webm', {
+        type: blob.type || 'audio/webm',
+      }),
+    );
+  } else {
+    formData.append('audio', {
+      uri,
+      name: 'capture.m4a',
+      type: mimeType,
+    } as unknown as Blob);
+  }
+
+  const response = await fetch(`${getMobileEnv().apiBaseUrl}/api/items/voice`, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body: formData,
+  });
+
+  const payload = (await response.json().catch(() => null)) as {
+    transcript?: string;
+    error?: string;
+  } | null;
+
+  if (!response.ok || !payload?.transcript) {
+    throw new Error(payload?.error ?? 'Voice transcription failed');
+  }
+
+  return payload.transcript;
 }
 
 export async function deleteItem(id: string) {
