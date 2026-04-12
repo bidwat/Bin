@@ -16,6 +16,10 @@ export default function AppLayout() {
           options={{ title: 'Feed', tabBarLabel: 'Feed' }}
         />
         <Tabs.Screen
+          name="search"
+          options={{ title: 'Search', tabBarLabel: 'Search' }}
+        />
+        <Tabs.Screen
           name="settings"
           options={{ title: 'Settings', tabBarLabel: 'Settings' }}
         />

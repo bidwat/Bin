@@ -56,3 +56,8 @@ export const updateProfileSchema = z
 export const createUrlItemSchema = z.object({
   url: z.string().trim().url(),
 });
+
+export const searchItemsSchema = z.object({
+  query: z.string().trim().min(1).max(500),
+  limit: z.coerce.number().int().min(1).max(50).default(20).optional(),
+});
