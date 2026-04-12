@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Item } from '@bin/shared';
 
@@ -18,6 +18,71 @@ export default function SearchPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const requestIdRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  async function runSearch(nextQuery: string) {
+    const trimmed = nextQuery.trim();
+
+    if (trimmed.length < 2) {
+      abortControllerRef.current?.abort();
+      setResults([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: trimmed, limit: 20 }),
+        signal: controller.signal,
+      });
+
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        results?: SearchResult[];
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? 'Search failed');
+      }
+
+      if (requestIdRef.current === requestId) {
+        setResults(payload?.results ?? []);
+      }
+    } catch (searchError: unknown) {
+      if (
+        searchError instanceof DOMException &&
+        searchError.name === 'AbortError'
+      ) {
+        return;
+      }
+
+      if (requestIdRef.current === requestId) {
+        setResults([]);
+        setError(
+          searchError instanceof Error ? searchError.message : 'Search failed',
+        );
+      }
+    } finally {
+      if (requestIdRef.current === requestId) {
+        setIsLoading(false);
+      }
+    }
+  }
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -29,41 +94,9 @@ export default function SearchPage() {
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-
     const timeout = window.setTimeout(() => {
-      void fetch('/api/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query: trimmed, limit: 20 }),
-      })
-        .then(async (response) => {
-          const payload = (await response.json().catch(() => null)) as {
-            error?: string;
-            results?: SearchResult[];
-          } | null;
-
-          if (!response.ok) {
-            throw new Error(payload?.error ?? 'Search failed');
-          }
-
-          setResults(payload?.results ?? []);
-        })
-        .catch((searchError: unknown) => {
-          setResults([]);
-          setError(
-            searchError instanceof Error
-              ? searchError.message
-              : 'Search failed',
-          );
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    }, 300);
+      void runSearch(trimmed);
+    }, 550);
 
     return () => window.clearTimeout(timeout);
   }, [query]);
@@ -103,10 +136,25 @@ export default function SearchPage() {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              void runSearch(query);
+            }
+          }}
           placeholder="Search for that startup idea about food..."
           className="w-full rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4 text-base text-slate-900 outline-none transition focus:border-slate-400"
         />
-        <p className="mt-3 text-sm text-slate-500">{resultCountLabel}</p>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-slate-500">{resultCountLabel}</p>
+          <button
+            type="button"
+            onClick={() => void runSearch(query)}
+            className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Search
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">

@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
-import { ItemType, type Item } from '@bin/shared';
+import { ItemType, type Cluster, type Item } from '@bin/shared';
 
 import { CaptureBar } from '@/components/CaptureBar';
+import { CollectionRail } from '@/components/CollectionRail';
 import { FeedFilterBar } from '@/components/FeedFilterBar';
 import { ItemDetailSheet } from '@/components/ItemDetailSheet';
 import { ItemCard } from '@/components/ItemCard';
@@ -13,15 +14,22 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 type FeedListProps = {
   initialItems: Item[];
+  initialCollections: Cluster[];
   userId: string;
 };
 
-export function FeedList({ initialItems, userId }: FeedListProps) {
+export function FeedList({
+  initialItems,
+  initialCollections,
+  userId,
+}: FeedListProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [items, setItems] = useState(initialItems);
+  const [collections, setCollections] = useState(initialCollections);
   const selectedItemId = searchParams.get('item');
+  const selectedCollectionId = searchParams.get('collection');
   const selectedType = Object.values(ItemType).includes(
     searchParams.get('type') as ItemType,
   )
@@ -30,13 +38,30 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null;
   const visibleItems = useMemo(
     () =>
-      selectedType ? items.filter((item) => item.type === selectedType) : items,
-    [items, selectedType],
+      items.filter((item) => {
+        if (selectedType && item.type !== selectedType) {
+          return false;
+        }
+
+        if (
+          selectedCollectionId &&
+          !item.clusterIds.includes(selectedCollectionId)
+        ) {
+          return false;
+        }
+
+        return true;
+      }),
+    [items, selectedCollectionId, selectedType],
   );
 
   useEffect(() => {
     setItems(initialItems);
   }, [initialItems]);
+
+  useEffect(() => {
+    setCollections(initialCollections);
+  }, [initialCollections]);
 
   function mapRealtimeItem(row: Record<string, unknown>) {
     const createdAt =
@@ -86,6 +111,19 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
       nextParams.set('type', nextType);
     } else {
       nextParams.delete('type');
+    }
+
+    const query = nextParams.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  function setCollectionFilter(nextCollectionId: string | null) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    if (nextCollectionId) {
+      nextParams.set('collection', nextCollectionId);
+    } else {
+      nextParams.delete('collection');
     }
 
     const query = nextParams.toString();
@@ -235,6 +273,11 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
       />
 
       <FeedFilterBar selectedType={selectedType} onSelectType={setTypeFilter} />
+      <CollectionRail
+        collections={collections}
+        selectedCollectionId={selectedCollectionId}
+        onSelect={setCollectionFilter}
+      />
 
       <div className="space-y-4">
         {visibleItems.length === 0 ? (

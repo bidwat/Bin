@@ -61,3 +61,7 @@ export const searchItemsSchema = z.object({
   query: z.string().trim().min(1).max(500),
   limit: z.coerce.number().int().min(1).max(50).default(20).optional(),
 });
+
+export const updateClusterSchema = z.object({
+  label: z.string().trim().min(1).max(80),
+});

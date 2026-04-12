@@ -9,7 +9,7 @@ import { useUserContext } from '@/context/UserContext';
 const primaryLinks = [
   { href: '/feed', label: 'Feed', disabled: false },
   { href: '/search', label: 'Search', disabled: false },
-  { href: '/collections', label: 'Collections', disabled: true },
+  { href: '/collections', label: 'Collections', disabled: false },
   { href: '/settings', label: 'Settings', disabled: true },
 ] as const;
 
@@ -69,7 +69,7 @@ export function Sidebar() {
           Capture first. Organize later.
         </p>
         <p className="mt-2 text-sm text-slate-600">
-          Search is live. Collections land next.
+          Search and Collections are live.
         </p>
         <button
           type="button"

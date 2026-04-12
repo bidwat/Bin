@@ -6,6 +6,7 @@ const required = {
 const requiredServer = {
   supabaseSecretKey: process.env.SUPABASE_SECRET_KEY,
   webhookSecret: process.env.WEBHOOK_SECRET,
+  cronSecret: process.env.CRON_SECRET,
 } as const;
 
 export function getPublicEnv() {
@@ -24,13 +25,20 @@ export function getPublicEnv() {
 export function getServerEnv() {
   const env = getPublicEnv();
 
-  if (!requiredServer.supabaseSecretKey || !requiredServer.webhookSecret) {
-    throw new Error('Missing SUPABASE_SECRET_KEY or WEBHOOK_SECRET');
+  if (
+    !requiredServer.supabaseSecretKey ||
+    !requiredServer.webhookSecret ||
+    !requiredServer.cronSecret
+  ) {
+    throw new Error(
+      'Missing SUPABASE_SECRET_KEY, WEBHOOK_SECRET, or CRON_SECRET',
+    );
   }
 
   return {
     ...env,
     supabaseSecretKey: requiredServer.supabaseSecretKey,
     webhookSecret: requiredServer.webhookSecret,
+    cronSecret: requiredServer.cronSecret,
   };
 }

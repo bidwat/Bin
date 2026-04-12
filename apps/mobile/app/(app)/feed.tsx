@@ -3,24 +3,35 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
-import { Actionability, ItemType, type Item } from '@bin/shared';
+import { Actionability, ItemType, type Cluster, type Item } from '@bin/shared';
 
+import { CollectionCard } from '../../src/components/CollectionCard';
 import { CaptureBar } from '../../src/components/CaptureBar';
 import { FeedFilterDrawer } from '../../src/components/FeedFilterDrawer';
 import { ItemCard } from '../../src/components/ItemCard';
-import { createItem, deleteItem, fetchItems } from '../../src/lib/api';
+import {
+  createItem,
+  deleteItem,
+  fetchCollections,
+  fetchItems,
+} from '../../src/lib/api';
 import { supabase } from '../../src/lib/supabase';
 
 export default function FeedScreen() {
   const [items, setItems] = useState<Item[]>([]);
+  const [collections, setCollections] = useState<Cluster[]>([]);
   const [selectedType, setSelectedType] = useState<ItemType | null>(null);
   const [selectedActionability, setSelectedActionability] =
     useState<Actionability | null>(null);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<
+    string | null
+  >(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -48,16 +59,33 @@ export default function FeedScreen() {
   const loadItems = useCallback(async () => {
     setRefreshing(true);
     try {
-      const payload = await fetchItems(selectedType, selectedActionability);
+      const [payload, nextCollections] = await Promise.all([
+        fetchItems(selectedType, selectedActionability),
+        fetchCollections(),
+      ]);
       setItems(payload.items);
+      setCollections(nextCollections);
     } finally {
       setRefreshing(false);
     }
   }, [selectedActionability, selectedType]);
 
   const activeFilterCount = useMemo(
-    () => [selectedType, selectedActionability].filter(Boolean).length,
-    [selectedActionability, selectedType],
+    () =>
+      [selectedType, selectedActionability, selectedCollectionId].filter(
+        Boolean,
+      ).length,
+    [selectedActionability, selectedCollectionId, selectedType],
+  );
+
+  const visibleItems = useMemo(
+    () =>
+      items.filter((item) =>
+        selectedCollectionId
+          ? item.clusterIds.includes(selectedCollectionId)
+          : true,
+      ),
+    [items, selectedCollectionId],
   );
 
   useEffect(() => {
@@ -84,7 +112,7 @@ export default function FeedScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={items}
+        data={visibleItems}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
@@ -113,8 +141,38 @@ export default function FeedScreen() {
                 {selectedActionability
                   ? `${selectedActionability[0]?.toUpperCase()}${selectedActionability.slice(1)}`
                   : 'All actionability'}
+                {selectedCollectionId ? ' · Collection on' : ''}
               </Text>
             </Pressable>
+            {collections.length > 0 ? (
+              <View style={styles.collectionsSection}>
+                <View style={styles.collectionsHeader}>
+                  <Text style={styles.collectionsEyebrow}>Collections</Text>
+                  {selectedCollectionId ? (
+                    <Pressable onPress={() => setSelectedCollectionId(null)}>
+                      <Text style={styles.clearCollectionText}>Clear</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.collectionsRail}>
+                    {collections.map((collection) => (
+                      <CollectionCard
+                        key={collection.id}
+                        cluster={collection}
+                        compact
+                        active={selectedCollectionId === collection.id}
+                        onPress={() =>
+                          setSelectedCollectionId((current) =>
+                            current === collection.id ? null : collection.id,
+                          )
+                        }
+                      />
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            ) : null}
           </View>
         }
         renderItem={({ item }) => (
@@ -204,5 +262,31 @@ const styles = StyleSheet.create({
   filterSummary: {
     color: '#64748b',
     fontSize: 13,
+  },
+  collectionsSection: {
+    gap: 10,
+    marginTop: 12,
+  },
+  collectionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  collectionsEyebrow: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  clearCollectionText: {
+    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  collectionsRail: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingBottom: 4,
   },
 });

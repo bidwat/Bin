@@ -1,7 +1,12 @@
-import { type Actionability, type Item } from '@bin/shared';
+import { type Actionability, type Cluster, type Item } from '@bin/shared';
 import type { Database } from '@bin/supabase';
 import { Platform } from 'react-native';
 
+import {
+  getChildSubclusters,
+  getTopLevelCollections,
+  mapClusterRow,
+} from './clusters';
 import { getMobileEnv } from './env';
 import { supabase } from './supabase';
 
@@ -16,6 +21,7 @@ function assertUuid(id: string) {
 
 export type UserProfile = Database['public']['Tables']['users']['Row'];
 type ItemRow = Database['public']['Tables']['items']['Row'];
+type ClusterRow = Database['public']['Tables']['clusters']['Row'];
 
 function mapItemRow(row: ItemRow): Item {
   return {
@@ -101,6 +107,113 @@ export async function fetchItems(
     items: data.map(mapItemRow),
     nextCursor: null,
   };
+}
+
+export async function fetchCollections() {
+  const [
+    { data: clusterRows, error: clusterError },
+    { data: itemRows, error: itemError },
+  ] = await Promise.all([
+    supabase
+      .from('clusters')
+      .select('*')
+      .order('member_count', { ascending: false }),
+    supabase.from('items').select('*').not('embedding', 'is', null),
+  ]);
+
+  if (clusterError) {
+    throw new Error(clusterError.message);
+  }
+
+  if (itemError) {
+    throw new Error(itemError.message);
+  }
+
+  const clusters = (clusterRows ?? []).map((row: ClusterRow) =>
+    mapClusterRow(row),
+  );
+  const items = (itemRows ?? []).map((row: ItemRow) => mapItemRow(row));
+
+  return getTopLevelCollections(clusters, items);
+}
+
+export async function fetchCollectionView(
+  clusterId: string,
+  subClusterId?: string | null,
+) {
+  assertUuid(clusterId);
+
+  if (subClusterId) {
+    assertUuid(subClusterId);
+  }
+
+  const [
+    { data: clusterRow, error: clusterError },
+    { data: clusterRows, error: clustersError },
+    { data: itemRows, error: itemsError },
+  ] = await Promise.all([
+    supabase.from('clusters').select('*').eq('id', clusterId).single(),
+    supabase
+      .from('clusters')
+      .select('*')
+      .order('member_count', { ascending: false }),
+    supabase.from('items').select('*').contains('cluster_ids', [clusterId]),
+  ]);
+
+  if (clusterError || !clusterRow) {
+    throw new Error(clusterError?.message ?? 'Collection not found');
+  }
+
+  if (clustersError) {
+    throw new Error(clustersError.message);
+  }
+
+  if (itemsError) {
+    throw new Error(itemsError.message);
+  }
+
+  const cluster = mapClusterRow(clusterRow as ClusterRow);
+  const allClusters = (clusterRows ?? []).map((row: ClusterRow) =>
+    mapClusterRow(row),
+  );
+  const allItems = (itemRows ?? []).map((row: ItemRow) => mapItemRow(row));
+  const subclusters = getChildSubclusters(allClusters, allItems, clusterId);
+  const items = subClusterId
+    ? allItems.filter((item) => item.subClusterId === subClusterId)
+    : allItems;
+
+  return {
+    cluster,
+    subclusters,
+    items,
+  };
+}
+
+export async function updateClusterLabel(id: string, label: string) {
+  assertUuid(id);
+
+  const response = await fetch(
+    `${getMobileEnv().apiBaseUrl}/api/clusters/${id}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(await getAuthHeaders()),
+      },
+      body: JSON.stringify({ label }),
+    },
+  );
+
+  const payload = (await response.json().catch(() => null)) as {
+    cluster?: Cluster;
+    error?: string;
+  } | null;
+
+  if (!response.ok || !payload?.cluster) {
+    throw new Error(payload?.error ?? 'Unable to update collection');
+  }
+
+  return payload.cluster;
 }
 
 export async function createItem(text: string) {

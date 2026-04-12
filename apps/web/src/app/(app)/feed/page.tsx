@@ -1,6 +1,7 @@
 import { ItemType } from '@bin/shared';
 
 import { FeedList } from '@/components/FeedList';
+import { getTopLevelCollections, mapClusterRow } from '@/lib/clusters';
 import { mapItemRow } from '@/lib/items';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
@@ -38,6 +39,22 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
   }
 
   const items = error || !data ? [] : data.map(mapItemRow);
+  const [{ data: clusterRows }, { data: allItemRows }] = await Promise.all([
+    supabase
+      .from('clusters')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('member_count', { ascending: false }),
+    supabase
+      .from('items')
+      .select('*')
+      .eq('user_id', user.id)
+      .not('embedding', 'is', null),
+  ]);
+  const collections = getTopLevelCollections(
+    (clusterRows ?? []).map(mapClusterRow),
+    (allItemRows ?? []).map(mapItemRow),
+  );
 
   return (
     <div className="space-y-8">
@@ -54,7 +71,11 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
         </p>
       </header>
 
-      <FeedList initialItems={items} userId={user.id} />
+      <FeedList
+        initialItems={items}
+        initialCollections={collections}
+        userId={user.id}
+      />
     </div>
   );
 }

@@ -20,8 +20,16 @@ export default function AppLayout() {
           options={{ title: 'Search', tabBarLabel: 'Search' }}
         />
         <Tabs.Screen
+          name="collections"
+          options={{ title: 'Collections', tabBarLabel: 'Collections' }}
+        />
+        <Tabs.Screen
           name="settings"
           options={{ title: 'Settings', tabBarLabel: 'Settings' }}
+        />
+        <Tabs.Screen
+          name="collection/[id]"
+          options={{ href: null, title: 'Collection' }}
         />
         <Tabs.Screen name="item/[id]" options={{ href: null, title: 'Item' }} />
       </Tabs>

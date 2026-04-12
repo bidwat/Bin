@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Keyboard,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -24,6 +25,7 @@ export default function SearchScreen() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -35,12 +37,9 @@ export default function SearchScreen() {
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-
     const timeout = setTimeout(() => {
       void search(trimmed);
-    }, 300);
+    }, 550);
 
     return () => clearTimeout(timeout);
   }, [query]);
@@ -58,6 +57,20 @@ export default function SearchScreen() {
   }
 
   async function search(nextQuery: string) {
+    const trimmed = nextQuery.trim();
+
+    if (trimmed.length < 2) {
+      setResults([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    setIsLoading(true);
+    setError(null);
+
     try {
       const response = await fetch(`${getMobileEnv().apiBaseUrl}/api/search`, {
         method: 'POST',
@@ -65,7 +78,7 @@ export default function SearchScreen() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${await getAccessToken()}`,
         },
-        body: JSON.stringify({ query: nextQuery, limit: 20 }),
+        body: JSON.stringify({ query: trimmed, limit: 20 }),
       });
 
       const payload = (await response.json().catch(() => null)) as {
@@ -77,14 +90,20 @@ export default function SearchScreen() {
         throw new Error(payload?.error ?? 'Search failed');
       }
 
-      setResults(payload?.results ?? []);
+      if (requestIdRef.current === requestId) {
+        setResults(payload?.results ?? []);
+      }
     } catch (searchError) {
-      setResults([]);
-      setError(
-        searchError instanceof Error ? searchError.message : 'Search failed',
-      );
+      if (requestIdRef.current === requestId) {
+        setResults([]);
+        setError(
+          searchError instanceof Error ? searchError.message : 'Search failed',
+        );
+      }
     } finally {
-      setIsLoading(false);
+      if (requestIdRef.current === requestId) {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -100,16 +119,25 @@ export default function SearchScreen() {
           style={styles.input}
           autoCapitalize="none"
           autoCorrect={false}
+          onSubmitEditing={() => void search(query)}
         />
-        <Text style={styles.summary}>
-          {query.trim().length < 2
-            ? 'Type at least two characters to search.'
-            : isLoading
-              ? 'Searching...'
-              : error
-                ? error
-                : `${results.length} result${results.length === 1 ? '' : 's'}`}
-        </Text>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summary}>
+            {query.trim().length < 2
+              ? 'Type at least two characters to search.'
+              : isLoading
+                ? 'Searching...'
+                : error
+                  ? error
+                  : `${results.length} result${results.length === 1 ? '' : 's'}`}
+          </Text>
+          <Pressable
+            style={styles.searchButton}
+            onPress={() => void search(query)}
+          >
+            <Text style={styles.searchButtonText}>Search</Text>
+          </Pressable>
+        </View>
       </View>
 
       <FlatList
@@ -171,6 +199,22 @@ const styles = StyleSheet.create({
   summary: {
     color: '#64748b',
     fontSize: 13,
+    flex: 1,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  searchButton: {
+    borderRadius: 999,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  searchButtonText: {
+    color: '#ffffff',
+    fontWeight: '700',
   },
   list: {
     paddingBottom: 24,
