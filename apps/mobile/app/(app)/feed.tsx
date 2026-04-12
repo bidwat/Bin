@@ -3,23 +3,26 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
-import { ItemType, type Item } from '@bin/shared';
+import { Actionability, ItemType, type Item } from '@bin/shared';
 
 import { CaptureBar } from '../../src/components/CaptureBar';
+import { FeedFilterDrawer } from '../../src/components/FeedFilterDrawer';
 import { ItemCard } from '../../src/components/ItemCard';
 import { createItem, deleteItem, fetchItems } from '../../src/lib/api';
 import { supabase } from '../../src/lib/supabase';
 
 export default function FeedScreen() {
   const [items, setItems] = useState<Item[]>([]);
-  const [selectedType, setSelectedType] = useState<Item['type']>(null);
+  const [selectedType, setSelectedType] = useState<ItemType | null>(null);
+  const [selectedActionability, setSelectedActionability] =
+    useState<Actionability | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   function buildPendingItem(source: 'voice' | 'image', message: string): Item {
     return {
@@ -45,17 +48,16 @@ export default function FeedScreen() {
   const loadItems = useCallback(async () => {
     setRefreshing(true);
     try {
-      const payload = await fetchItems(selectedType);
+      const payload = await fetchItems(selectedType, selectedActionability);
       setItems(payload.items);
     } finally {
       setRefreshing(false);
     }
-  }, [selectedType]);
+  }, [selectedActionability, selectedType]);
 
-  const visibleItems = useMemo(
-    () =>
-      selectedType ? items.filter((item) => item.type === selectedType) : items,
-    [items, selectedType],
+  const activeFilterCount = useMemo(
+    () => [selectedType, selectedActionability].filter(Boolean).length,
+    [selectedActionability, selectedType],
   );
 
   useEffect(() => {
@@ -82,7 +84,7 @@ export default function FeedScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={visibleItems}
+        data={items}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
@@ -95,25 +97,24 @@ export default function FeedScreen() {
           <View style={styles.header}>
             <Text style={styles.eyebrow}>Feed</Text>
             <Text style={styles.title}>Everything you have captured</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filters}
+            <Pressable
+              style={styles.filterButton}
+              onPress={() => setIsFilterOpen(true)}
             >
-              <FilterChip
-                active={selectedType === null}
-                label="All"
-                onPress={() => setSelectedType(null)}
-              />
-              {Object.values(ItemType).map((value) => (
-                <FilterChip
-                  key={value}
-                  active={selectedType === value}
-                  label={`${value[0]?.toUpperCase()}${value.slice(1)}`}
-                  onPress={() => setSelectedType(value)}
-                />
-              ))}
-            </ScrollView>
+              <Text style={styles.filterButtonText}>
+                Filters
+                {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+              </Text>
+              <Text style={styles.filterSummary}>
+                {selectedType
+                  ? `${selectedType[0]?.toUpperCase()}${selectedType.slice(1)}`
+                  : 'All types'}
+                {' · '}
+                {selectedActionability
+                  ? `${selectedActionability[0]?.toUpperCase()}${selectedActionability.slice(1)}`
+                  : 'All actionability'}
+              </Text>
+            </Pressable>
           </View>
         }
         renderItem={({ item }) => (
@@ -151,33 +152,15 @@ export default function FeedScreen() {
           void loadItems();
         }}
       />
+      <FeedFilterDrawer
+        visible={isFilterOpen}
+        selectedType={selectedType}
+        selectedActionability={selectedActionability}
+        onSelectType={setSelectedType}
+        onSelectActionability={setSelectedActionability}
+        onClose={() => setIsFilterOpen(false)}
+      />
     </View>
-  );
-}
-
-function FilterChip({
-  active,
-  label,
-  onPress,
-}: {
-  active: boolean;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      style={[styles.filterChip, active ? styles.filterChipActive : null]}
-      onPress={onPress}
-    >
-      <Text
-        style={[
-          styles.filterChipText,
-          active ? styles.filterChipTextActive : null,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -194,10 +177,6 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 8,
   },
-  filters: {
-    gap: 8,
-    paddingTop: 8,
-  },
   eyebrow: {
     color: '#b45309',
     textTransform: 'uppercase',
@@ -210,23 +189,20 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '700',
   },
-  filterChip: {
-    borderRadius: 999,
+  filterButton: {
+    marginTop: 8,
+    borderRadius: 20,
     backgroundColor: '#ffffff',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 4,
   },
-  filterChipActive: {
-    backgroundColor: '#0f172a',
-    borderColor: '#0f172a',
+  filterButtonText: {
+    color: '#0f172a',
+    fontWeight: '700',
   },
-  filterChipText: {
-    color: '#334155',
-    fontWeight: '600',
-  },
-  filterChipTextActive: {
-    color: '#ffffff',
+  filterSummary: {
+    color: '#64748b',
+    fontSize: 13,
   },
 });

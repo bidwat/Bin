@@ -1,4 +1,4 @@
-import type { Item } from '@bin/shared';
+import { type Actionability, type Item } from '@bin/shared';
 import type { Database } from '@bin/supabase';
 import { Platform } from 'react-native';
 
@@ -73,7 +73,10 @@ async function getAuthHeaders() {
   };
 }
 
-export async function fetchItems(type?: Item['type'] | null) {
+export async function fetchItems(
+  type?: Item['type'] | null,
+  actionability?: Actionability | null,
+) {
   let query = supabase
     .from('items')
     .select('*')
@@ -82,6 +85,10 @@ export async function fetchItems(type?: Item['type'] | null) {
 
   if (type) {
     query = query.eq('type', type);
+  }
+
+  if (actionability) {
+    query = query.eq('actionability', actionability);
   }
 
   const { data, error } = await query;

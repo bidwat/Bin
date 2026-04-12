@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ItemType, type Item } from '@bin/shared';
 
 import { CaptureBar } from '@/components/CaptureBar';
+import { FeedFilterBar } from '@/components/FeedFilterBar';
 import { ItemDetailSheet } from '@/components/ItemDetailSheet';
 import { ItemCard } from '@/components/ItemCard';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
@@ -233,21 +234,7 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
         onImageCaptured={handleCreatedItem}
       />
 
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        <FilterChip
-          active={selectedType === null}
-          label="All"
-          onClick={() => setTypeFilter(null)}
-        />
-        {Object.values(ItemType).map((value) => (
-          <FilterChip
-            key={value}
-            active={selectedType === value}
-            label={`${value[0]?.toUpperCase()}${value.slice(1)}`}
-            onClick={() => setTypeFilter(value)}
-          />
-        ))}
-      </div>
+      <FeedFilterBar selectedType={selectedType} onSelectType={setTypeFilter} />
 
       <div className="space-y-4">
         {visibleItems.length === 0 ? (
@@ -274,29 +261,5 @@ export function FeedList({ initialItems, userId }: FeedListProps) {
         />
       ) : null}
     </div>
-  );
-}
-
-function FilterChip({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-        active
-          ? 'border-slate-950 bg-slate-950 text-white'
-          : 'border-slate-200 bg-white text-slate-600'
-      }`}
-    >
-      {label}
-    </button>
   );
 }
