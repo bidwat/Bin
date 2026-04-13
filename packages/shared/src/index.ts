@@ -61,6 +61,7 @@ export interface Cluster {
   id: string;
   userId: string;
   label: string;
+  parentClusterId?: string | null;
   typeScope?: ItemType | null;
   memberCount: number;
   createdAt: string;

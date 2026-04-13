@@ -3,7 +3,8 @@ import type { Database } from '@bin/supabase';
 import { Platform } from 'react-native';
 
 import {
-  getChildSubclusters,
+  buildClusterBreadcrumbs,
+  getChildClusters,
   getTopLevelCollections,
   mapClusterRow,
 } from './clusters';
@@ -137,15 +138,8 @@ export async function fetchCollections() {
   return getTopLevelCollections(clusters, items);
 }
 
-export async function fetchCollectionView(
-  clusterId: string,
-  subClusterId?: string | null,
-) {
+export async function fetchCollectionView(clusterId: string) {
   assertUuid(clusterId);
-
-  if (subClusterId) {
-    assertUuid(subClusterId);
-  }
 
   const [
     { data: clusterRow, error: clusterError },
@@ -177,15 +171,14 @@ export async function fetchCollectionView(
     mapClusterRow(row),
   );
   const allItems = (itemRows ?? []).map((row: ItemRow) => mapItemRow(row));
-  const subclusters = getChildSubclusters(allClusters, allItems, clusterId);
-  const items = subClusterId
-    ? allItems.filter((item) => item.subClusterId === subClusterId)
-    : allItems;
+  const childClusters = getChildClusters(allClusters, clusterId);
+  const breadcrumbs = buildClusterBreadcrumbs(allClusters, clusterId);
 
   return {
     cluster,
-    subclusters,
-    items,
+    childClusters,
+    breadcrumbs,
+    items: allItems,
   };
 }
 

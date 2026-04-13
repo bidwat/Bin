@@ -1,22 +1,23 @@
 import { notFound } from 'next/navigation';
 
 import { CollectionDetailClient } from '@/components/CollectionDetailClient';
-import { getChildSubclusters, mapClusterRow } from '@/lib/clusters';
+import {
+  buildClusterBreadcrumbs,
+  getChildClusters,
+  mapClusterRow,
+} from '@/lib/clusters';
 import { mapItemRow } from '@/lib/items';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 type CollectionDetailPageProps = {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ sub?: string }>;
 };
 
 export default async function CollectionDetailPage({
   params,
-  searchParams,
 }: CollectionDetailPageProps) {
   const supabase = await createSupabaseServerClient();
   const { id } = await params;
-  const selectedSubclusterId = (await searchParams)?.sub ?? null;
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -52,23 +53,15 @@ export default async function CollectionDetailPage({
   const cluster = mapClusterRow(clusterRow);
   const allClusters = (clusterRows ?? []).map(mapClusterRow);
   const collectionItems = (itemRows ?? []).map(mapItemRow);
-  const subclusters = getChildSubclusters(
-    allClusters,
-    collectionItems,
-    cluster.id,
-  );
-  const visibleItems = selectedSubclusterId
-    ? collectionItems.filter(
-        (item) => item.subClusterId === selectedSubclusterId,
-      )
-    : collectionItems;
+  const childClusters = getChildClusters(allClusters, cluster.id);
+  const breadcrumbs = buildClusterBreadcrumbs(allClusters, cluster.id);
 
   return (
     <CollectionDetailClient
       cluster={cluster}
-      subclusters={subclusters}
-      items={visibleItems}
-      selectedSubclusterId={selectedSubclusterId}
+      childClusters={childClusters}
+      breadcrumbs={breadcrumbs}
+      items={collectionItems}
     />
   );
 }

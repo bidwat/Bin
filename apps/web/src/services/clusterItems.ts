@@ -8,10 +8,6 @@ import { getServerEnv } from '@/lib/env';
 type SupabaseClient = ReturnType<typeof createAdminSupabaseClient>;
 type ItemRow = Database['public']['Tables']['items']['Row'];
 type ClusterInsert = Database['public']['Tables']['clusters']['Insert'];
-type ClusterUpdate = Pick<
-  Database['public']['Tables']['items']['Update'],
-  'cluster_ids' | 'sub_cluster_id'
->;
 
 type VectorItem = {
   id: string;
@@ -25,8 +21,15 @@ type BuiltCluster = {
   label: string;
   centroid: number[];
   typeScope: ItemTypeValue;
+  parentClusterId: string | null;
   memberIds: string[];
-  level: 'collection' | 'subcluster';
+  depth: number;
+};
+
+type ItemAssignment = {
+  clusterIds: Set<string>;
+  deepestClusterId: string | null;
+  deepestDepth: number;
 };
 
 type ClusterSummary = {
@@ -36,7 +39,8 @@ type ClusterSummary = {
   subclusterCount: number;
 };
 
-const MIN_CLUSTER_ITEMS = 15;
+const MIN_CLUSTER_ITEMS = 8;
+const MAX_CLUSTER_DEPTH = 4;
 
 function parseEmbedding(value: string | null) {
   if (!value) {
@@ -121,7 +125,6 @@ function chooseInitialCentroids(points: VectorItem[], count: number) {
           cosineSimilarity(point.vector, centroid),
         ),
       );
-
       const distance = 1 - nearest;
 
       if (distance > bestDistance) {
@@ -202,14 +205,13 @@ function clusterPoints(points: VectorItem[], requestedCount: number) {
     .filter((cluster) => cluster.members.length > 0);
 }
 
-function chooseClusterCount(
-  itemCount: number,
-  bucketSize: number,
-  maxClusters: number,
-) {
-  if (itemCount < MIN_CLUSTER_ITEMS) {
+function chooseClusterCount(itemCount: number, depth: number) {
+  if (itemCount < MIN_CLUSTER_ITEMS || depth > MAX_CLUSTER_DEPTH) {
     return 0;
   }
+
+  const bucketSize = depth === 0 ? 20 : 12;
+  const maxClusters = depth === 0 ? 5 : 4;
 
   return Math.max(2, Math.min(Math.ceil(itemCount / bucketSize), maxClusters));
 }
@@ -217,13 +219,11 @@ function chooseClusterCount(
 async function buildClusters(
   points: VectorItem[],
   typeScope: ItemTypeValue,
-  level: 'collection' | 'subcluster',
+  depth: number,
+  parentClusterId: string | null,
   labelClusterFn: typeof labelCluster,
 ) {
-  const clusterCount =
-    level === 'collection'
-      ? chooseClusterCount(points.length, 15, 8)
-      : chooseClusterCount(points.length, 8, 5);
+  const clusterCount = chooseClusterCount(points.length, depth);
 
   if (clusterCount < 2) {
     return [];
@@ -240,26 +240,30 @@ async function buildClusters(
 
     const label =
       sampleTexts.length > 0
-        ? await labelClusterFn(sampleTexts, typeScope, level)
-        : `${typeScope} ${level}`;
+        ? await labelClusterFn(
+            sampleTexts,
+            typeScope,
+            depth === 0 ? 'collection' : 'subcluster',
+          )
+        : `${typeScope} cluster`;
 
     builtClusters.push({
       id: crypto.randomUUID(),
       label,
       centroid: rawCluster.centroid,
       typeScope,
+      parentClusterId,
       memberIds: rawCluster.members.map((member) => member.id),
-      level,
+      depth,
     });
   }
 
   return builtClusters;
 }
 
-function determineCollectionMembership(
+function determineTopLevelMembership(
   item: VectorItem,
   clusters: BuiltCluster[],
-  primaryClusterId: string,
 ) {
   const similarities = clusters
     .map((cluster) => ({
@@ -272,9 +276,7 @@ function determineCollectionMembership(
 
   return similarities
     .filter(
-      (entry) =>
-        entry.id === primaryClusterId ||
-        (entry.similarity >= 0.78 && primary - entry.similarity <= 0.06),
+      (entry) => entry.similarity >= 0.72 && primary - entry.similarity <= 0.08,
     )
     .slice(0, 3)
     .map((entry) => entry.id);
@@ -334,6 +336,78 @@ async function resetExistingClusters(supabase: SupabaseClient, userId: string) {
   }
 }
 
+function assignCluster(
+  itemAssignments: Map<string, ItemAssignment>,
+  itemId: string,
+  clusterId: string,
+  depth: number,
+) {
+  const current = itemAssignments.get(itemId) ?? {
+    clusterIds: new Set<string>(),
+    deepestClusterId: null,
+    deepestDepth: -1,
+  };
+
+  current.clusterIds.add(clusterId);
+
+  if (depth > current.deepestDepth && depth > 0) {
+    current.deepestDepth = depth;
+    current.deepestClusterId = clusterId;
+  }
+
+  itemAssignments.set(itemId, current);
+}
+
+async function buildClusterTree(
+  points: VectorItem[],
+  typeScope: ItemTypeValue,
+  depth: number,
+  parentClusterId: string | null,
+  clusterRows: ClusterInsert[],
+  itemAssignments: Map<string, ItemAssignment>,
+  labelClusterFn: typeof labelCluster,
+) {
+  const clusters = await buildClusters(
+    points,
+    typeScope,
+    depth,
+    parentClusterId,
+    labelClusterFn,
+  );
+
+  for (const cluster of clusters) {
+    clusterRows.push({
+      id: cluster.id,
+      user_id: '',
+      label: cluster.label,
+      centroid: serializeEmbedding(cluster.centroid),
+      parent_cluster_id: cluster.parentClusterId,
+      type_scope: cluster.typeScope,
+      member_count: cluster.memberIds.length,
+    });
+
+    const members = points.filter((item) =>
+      cluster.memberIds.includes(item.id),
+    );
+
+    for (const member of members) {
+      assignCluster(itemAssignments, member.id, cluster.id, cluster.depth);
+    }
+
+    await buildClusterTree(
+      members,
+      typeScope,
+      depth + 1,
+      cluster.id,
+      clusterRows,
+      itemAssignments,
+      labelClusterFn,
+    );
+  }
+
+  return clusters;
+}
+
 export async function clusterItemsForUser(
   userId: string,
   deps?: {
@@ -348,7 +422,6 @@ export async function clusterItemsForUser(
       return createAdminSupabaseClient(env.supabaseUrl, env.supabaseSecretKey);
     })();
   const labelClusterFn = deps?.labelClusterFn ?? labelCluster;
-
   const items = await fetchEmbeddableItems(supabase, userId);
 
   if (items.length < MIN_CLUSTER_ITEMS) {
@@ -370,7 +443,7 @@ export async function clusterItemsForUser(
   }
 
   const clusterRows: ClusterInsert[] = [];
-  const itemUpdates = new Map<string, ClusterUpdate>();
+  const itemAssignments = new Map<string, ItemAssignment>();
   let collectionCount = 0;
   let subclusterCount = 0;
 
@@ -378,7 +451,8 @@ export async function clusterItemsForUser(
     const topLevelClusters = await buildClusters(
       typedItems,
       typeScope,
-      'collection',
+      0,
+      null,
       labelClusterFn,
     );
 
@@ -388,12 +462,21 @@ export async function clusterItemsForUser(
 
     collectionCount += topLevelClusters.length;
 
+    for (const item of typedItems) {
+      const memberships = determineTopLevelMembership(item, topLevelClusters);
+
+      for (const clusterId of memberships) {
+        assignCluster(itemAssignments, item.id, clusterId, 0);
+      }
+    }
+
     for (const cluster of topLevelClusters) {
       clusterRows.push({
         id: cluster.id,
         user_id: userId,
         label: cluster.label,
         centroid: serializeEmbedding(cluster.centroid),
+        parent_cluster_id: null,
         type_scope: cluster.typeScope,
         member_count: cluster.memberIds.length,
       });
@@ -401,72 +484,45 @@ export async function clusterItemsForUser(
       const members = typedItems.filter((item) =>
         cluster.memberIds.includes(item.id),
       );
-      const subclusters = await buildClusters(
+      const beforeCount = clusterRows.length;
+
+      await buildClusterTree(
         members,
         typeScope,
-        'subcluster',
+        1,
+        cluster.id,
+        clusterRows,
+        itemAssignments,
         labelClusterFn,
       );
 
-      for (const member of members) {
-        const membership = determineCollectionMembership(
-          member,
-          topLevelClusters,
-          cluster.id,
-        );
-        const current = itemUpdates.get(member.id) ?? {
-          cluster_ids: [],
-          sub_cluster_id: null,
-        };
-
-        current.cluster_ids = [
-          ...new Set([...(current.cluster_ids ?? []), ...membership]),
-        ];
-        itemUpdates.set(member.id, current);
-      }
-
-      if (subclusters.length > 0) {
-        subclusterCount += subclusters.length;
-
-        for (const subcluster of subclusters) {
-          clusterRows.push({
-            id: subcluster.id,
-            user_id: userId,
-            label: subcluster.label,
-            centroid: serializeEmbedding(subcluster.centroid),
-            type_scope: subcluster.typeScope,
-            member_count: subcluster.memberIds.length,
-          });
-
-          for (const memberId of subcluster.memberIds) {
-            const current = itemUpdates.get(memberId) ?? {
-              cluster_ids: [cluster.id],
-              sub_cluster_id: null,
-            };
-            current.sub_cluster_id = subcluster.id;
-            itemUpdates.set(memberId, current);
-          }
-        }
-      }
+      subclusterCount += clusterRows.length - beforeCount;
     }
   }
 
   await resetExistingClusters(supabase, userId);
 
   if (clusterRows.length > 0) {
+    const finalClusterRows = clusterRows.map((row) => ({
+      ...row,
+      user_id: userId,
+    }));
     const { error: insertError } = await supabase
       .from('clusters')
-      .insert(clusterRows);
+      .insert(finalClusterRows);
 
     if (insertError) {
       throw new Error(insertError.message);
     }
   }
 
-  for (const [itemId, updates] of itemUpdates.entries()) {
+  for (const [itemId, assignment] of itemAssignments.entries()) {
     const { error } = await supabase
       .from('items')
-      .update(updates as Database['public']['Tables']['items']['Update'])
+      .update({
+        cluster_ids: [...assignment.clusterIds],
+        sub_cluster_id: assignment.deepestClusterId,
+      } as Database['public']['Tables']['items']['Update'])
       .eq('id', itemId)
       .eq('user_id', userId);
 

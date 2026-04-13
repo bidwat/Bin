@@ -27,6 +27,7 @@ type ClusterRow = {
   user_id: string;
   label: string;
   centroid: string | null;
+  parent_cluster_id?: string | null;
   type_scope: 'idea';
   member_count: number;
   created_at?: string;
@@ -40,7 +41,7 @@ function formatEmbedding(x: number, y: number) {
 function createItems() {
   const items: ItemRow[] = [];
 
-  for (let index = 0; index < 15; index += 1) {
+  for (let index = 0; index < 18; index += 1) {
     items.push({
       id: `group-a-${index}`,
       user_id: 'user-1',
@@ -62,7 +63,7 @@ function createItems() {
     });
   }
 
-  for (let index = 0; index < 15; index += 1) {
+  for (let index = 0; index < 18; index += 1) {
     items.push({
       id: `group-b-${index}`,
       user_id: 'user-1',
@@ -181,7 +182,7 @@ function createFakeSupabase(initialItems: ItemRow[]) {
 }
 
 describe('clusterItemsForUser', () => {
-  it('builds collection and subcluster assignments for processed items', async () => {
+  it('builds recursive collection assignments for processed items', async () => {
     const fakeSupabase = createFakeSupabase(createItems());
 
     const summary = await clusterItemsForUser('user-1', {
@@ -192,12 +193,17 @@ describe('clusterItemsForUser', () => {
 
     expect(summary.clustered).toBe(true);
     expect(summary.collectionCount).toBeGreaterThanOrEqual(2);
-    expect(fakeSupabase.state.clusters.length).toBeGreaterThanOrEqual(2);
+    expect(fakeSupabase.state.clusters.length).toBeGreaterThanOrEqual(4);
     expect(
       fakeSupabase.state.items.every((item) => item.cluster_ids.length > 0),
     ).toBe(true);
     expect(
       fakeSupabase.state.items.some((item) => item.sub_cluster_id !== null),
+    ).toBe(true);
+    expect(
+      fakeSupabase.state.clusters.some(
+        (cluster) => cluster.parent_cluster_id !== null,
+      ),
     ).toBe(true);
     expect(
       fakeSupabase.state.clusters.every((cluster) =>

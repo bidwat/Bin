@@ -12,29 +12,23 @@ import { ItemDetailSheet } from '@/components/ItemDetailSheet';
 
 type CollectionDetailClientProps = {
   cluster: Cluster;
-  subclusters: Cluster[];
+  childClusters: Cluster[];
+  breadcrumbs: Cluster[];
   items: Item[];
-  selectedSubclusterId: string | null;
 };
 
 export function CollectionDetailClient({
   cluster,
-  subclusters,
+  childClusters,
+  breadcrumbs,
   items,
-  selectedSubclusterId,
 }: CollectionDetailClientProps) {
   const router = useRouter();
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [labelDraft, setLabelDraft] = useState(cluster.label);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  const selectedSubcluster = useMemo(
-    () =>
-      subclusters.find((entry) => entry.id === selectedSubclusterId) ?? null,
-    [selectedSubclusterId, subclusters],
-  );
-  const activeCluster = selectedSubcluster ?? cluster;
+  const activeCluster = useMemo(() => cluster, [cluster]);
 
   useEffect(() => {
     setLabelDraft(activeCluster.label);
@@ -81,9 +75,9 @@ export function CollectionDetailClient({
         >
           Collections
         </Link>
-        {selectedSubcluster ? (
+        {breadcrumbs.length > 1 ? (
           <p className="text-sm text-slate-500">
-            {cluster.label} / {selectedSubcluster.label}
+            {breadcrumbs.map((entry) => entry.label).join(' / ')}
           </p>
         ) : null}
         <div className="flex flex-col gap-3 rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] md:flex-row md:items-end md:justify-between">
@@ -114,29 +108,18 @@ export function CollectionDetailClient({
         </div>
       </div>
 
-      {subclusters.length > 0 ? (
+      {childClusters.length > 0 ? (
         <section className="space-y-3">
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
-              Subcollections
-            </p>
-            {selectedSubclusterId ? (
-              <Link
-                href={`/collections/${cluster.id}`}
-                className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
-              >
-                Clear
-              </Link>
-            ) : null}
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+            Child Collections
+          </p>
           <div className="flex gap-4 overflow-x-auto pb-2">
-            {subclusters.map((subcluster) => (
-              <div key={subcluster.id} className="min-w-[240px] shrink-0">
+            {childClusters.map((childCluster) => (
+              <div key={childCluster.id} className="min-w-[240px] shrink-0">
                 <CollectionCard
-                  cluster={subcluster}
+                  cluster={childCluster}
                   compact
-                  active={selectedSubclusterId === subcluster.id}
-                  href={`/collections/${cluster.id}?sub=${subcluster.id}`}
+                  href={`/collections/${childCluster.id}`}
                 />
               </div>
             ))}

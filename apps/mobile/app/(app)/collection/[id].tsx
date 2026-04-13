@@ -19,32 +19,24 @@ import { fetchCollectionView, updateClusterLabel } from '../../../src/lib/api';
 
 export default function CollectionDetailScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id: string; subClusterId?: string }>();
+  const params = useLocalSearchParams<{ id: string }>();
   const [cluster, setCluster] = useState<Cluster | null>(null);
-  const [subclusters, setSubclusters] = useState<Cluster[]>([]);
+  const [childClusters, setChildClusters] = useState<Cluster[]>([]);
+  const [breadcrumbs, setBreadcrumbs] = useState<Cluster[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [labelDraft, setLabelDraft] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const selectedSubcluster = useMemo(
-    () => subclusters.find((entry) => entry.id === params.subClusterId) ?? null,
-    [params.subClusterId, subclusters],
-  );
-  const activeCluster = selectedSubcluster ?? cluster;
+  const activeCluster = useMemo(() => cluster, [cluster]);
 
   const loadView = useCallback(async () => {
-    const payload = await fetchCollectionView(
-      params.id,
-      params.subClusterId ?? null,
-    );
+    const payload = await fetchCollectionView(params.id);
     setCluster(payload.cluster);
-    setSubclusters(payload.subclusters);
+    setChildClusters(payload.childClusters);
+    setBreadcrumbs(payload.breadcrumbs);
     setItems(payload.items);
-    const nextActiveCluster =
-      payload.subclusters.find((entry) => entry.id === params.subClusterId) ??
-      payload.cluster;
-    setLabelDraft(nextActiveCluster.label);
-  }, [params.id, params.subClusterId]);
+    setLabelDraft(payload.cluster.label);
+  }, [params.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -67,15 +59,10 @@ export default function CollectionDetailScreen() {
 
     try {
       const updated = await updateClusterLabel(activeCluster.id, nextLabel);
-
-      if (selectedSubcluster) {
-        setSubclusters((current) =>
-          current.map((entry) => (entry.id === updated.id ? updated : entry)),
-        );
-      } else {
-        setCluster(updated);
-      }
-
+      setCluster(updated);
+      setBreadcrumbs((current) =>
+        current.map((entry) => (entry.id === updated.id ? updated : entry)),
+      );
       setLabelDraft(updated.label);
     } catch (error) {
       Alert.alert(
@@ -102,9 +89,9 @@ export default function CollectionDetailScreen() {
             <Pressable onPress={() => router.back()}>
               <Text style={styles.backLink}>Collections</Text>
             </Pressable>
-            {selectedSubcluster ? (
+            {breadcrumbs.length > 1 ? (
               <Text style={styles.breadcrumb}>
-                {cluster.label} / {selectedSubcluster.label}
+                {breadcrumbs.map((entry) => entry.label).join(' / ')}
               </Text>
             ) : null}
             <TextInput
@@ -126,38 +113,20 @@ export default function CollectionDetailScreen() {
                 </Text>
               </Pressable>
             </View>
-            {subclusters.length > 0 ? (
+            {childClusters.length > 0 ? (
               <View style={styles.subclustersSection}>
-                <View style={styles.subclustersHeader}>
-                  <Text style={styles.subclustersEyebrow}>Subcollections</Text>
-                  {params.subClusterId ? (
-                    <Pressable
-                      onPress={() =>
-                        router.replace({
-                          pathname: '/(app)/collection/[id]',
-                          params: { id: cluster.id },
-                        })
-                      }
-                    >
-                      <Text style={styles.clearLink}>Clear</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
+                <Text style={styles.subclustersEyebrow}>Child Collections</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.subclustersRail}>
-                    {subclusters.map((subcluster) => (
+                    {childClusters.map((childCluster) => (
                       <CollectionCard
-                        key={subcluster.id}
-                        cluster={subcluster}
+                        key={childCluster.id}
+                        cluster={childCluster}
                         compact
-                        active={params.subClusterId === subcluster.id}
                         onPress={() =>
-                          router.replace({
+                          router.push({
                             pathname: '/(app)/collection/[id]',
-                            params: {
-                              id: cluster.id,
-                              subClusterId: subcluster.id,
-                            },
+                            params: { id: childCluster.id },
                           })
                         }
                       />
@@ -239,22 +208,12 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 8,
   },
-  subclustersHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   subclustersEyebrow: {
     color: '#64748b',
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1.5,
-  },
-  clearLink: {
-    color: '#0f172a',
-    fontSize: 12,
-    fontWeight: '700',
   },
   subclustersRail: {
     flexDirection: 'row',

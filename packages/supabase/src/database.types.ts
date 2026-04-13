@@ -42,6 +42,7 @@ export type Database = {
           label: string;
           last_updated_at: string;
           member_count: number;
+          parent_cluster_id: string | null;
           type_scope: Database['public']['Enums']['item_type'] | null;
           user_id: string;
         };
@@ -52,6 +53,7 @@ export type Database = {
           label: string;
           last_updated_at?: string;
           member_count?: number;
+          parent_cluster_id?: string | null;
           type_scope?: Database['public']['Enums']['item_type'] | null;
           user_id: string;
         };
@@ -62,10 +64,18 @@ export type Database = {
           label?: string;
           last_updated_at?: string;
           member_count?: number;
+          parent_cluster_id?: string | null;
           type_scope?: Database['public']['Enums']['item_type'] | null;
           user_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: 'clusters_parent_cluster_id_fkey';
+            columns: ['parent_cluster_id'];
+            isOneToOne: false;
+            referencedRelation: 'clusters';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'clusters_user_id_fkey';
             columns: ['user_id'];

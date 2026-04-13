@@ -8,6 +8,7 @@ export function mapClusterRow(row: ClusterRow): Cluster {
     id: row.id,
     userId: row.user_id,
     label: row.label,
+    parentClusterId: row.parent_cluster_id,
     typeScope: row.type_scope as ItemType | null,
     memberCount: row.member_count,
     createdAt: row.created_at,
@@ -17,40 +18,43 @@ export function mapClusterRow(row: ClusterRow): Cluster {
 
 export function getTopLevelCollections(
   clusters: Cluster[],
-  items: Pick<Item, 'clusterIds' | 'subClusterId'>[],
+  items: Pick<Item, 'clusterIds'>[],
 ) {
   const topLevelIds = new Set<string>();
-  const subClusterIds = new Set<string>();
 
   for (const item of items) {
     for (const clusterId of item.clusterIds) {
       topLevelIds.add(clusterId);
     }
-
-    if (item.subClusterId) {
-      subClusterIds.add(item.subClusterId);
-    }
   }
 
   return clusters.filter(
-    (cluster) => topLevelIds.has(cluster.id) && !subClusterIds.has(cluster.id),
+    (cluster) => topLevelIds.has(cluster.id) && !cluster.parentClusterId,
   );
 }
 
-export function getChildSubclusters(
+export function getChildClusters(clusters: Cluster[], parentClusterId: string) {
+  return clusters.filter(
+    (cluster) => cluster.parentClusterId === parentClusterId,
+  );
+}
+
+export function buildClusterBreadcrumbs(
   clusters: Cluster[],
-  items: Pick<Item, 'clusterIds' | 'subClusterId'>[],
-  parentClusterId: string,
+  clusterId: string,
 ) {
-  const subClusterIds = new Set<string>();
+  const clustersById = new Map(
+    clusters.map((cluster) => [cluster.id, cluster]),
+  );
+  const breadcrumb: Cluster[] = [];
+  let current = clustersById.get(clusterId) ?? null;
 
-  for (const item of items) {
-    if (!item.clusterIds.includes(parentClusterId) || !item.subClusterId) {
-      continue;
-    }
-
-    subClusterIds.add(item.subClusterId);
+  while (current) {
+    breadcrumb.unshift(current);
+    current = current.parentClusterId
+      ? (clustersById.get(current.parentClusterId) ?? null)
+      : null;
   }
 
-  return clusters.filter((cluster) => subClusterIds.has(cluster.id));
+  return breadcrumb;
 }
