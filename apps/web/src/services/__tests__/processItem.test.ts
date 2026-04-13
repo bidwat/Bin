@@ -27,13 +27,19 @@ function createAdminClient({
   itemRow,
   memoryRows = [],
   updatedRow,
+  userRow = {
+    timezone: 'America/Chicago',
+    auto_create_reminders: true,
+  },
 }: {
   itemRow: Record<string, unknown>;
   memoryRows?: Array<{ statement: string }>;
   updatedRow?: Record<string, unknown>;
+  userRow?: { timezone: string; auto_create_reminders: boolean };
 }) {
   const itemsSelectSingle = vi.fn(async () => ({ data: itemRow, error: null }));
   const memoryLimit = vi.fn(async () => ({ data: memoryRows, error: null }));
+  const userSingle = vi.fn(async () => ({ data: userRow, error: null }));
   const updateSingle = vi.fn(async () => ({
     data: updatedRow ?? itemRow,
     error: null,
@@ -50,6 +56,12 @@ function createAdminClient({
       order: vi.fn(() => ({
         limit: memoryLimit,
       })),
+    })),
+  };
+
+  const usersSelect = {
+    eq: vi.fn(() => ({
+      single: userSingle,
     })),
   };
 
@@ -75,6 +87,12 @@ function createAdminClient({
       if (table === 'user_memory') {
         return {
           select: vi.fn(() => memorySelect),
+        };
+      }
+
+      if (table === 'users') {
+        return {
+          select: vi.fn(() => usersSelect),
         };
       }
 
@@ -125,7 +143,7 @@ describe('processItem', () => {
         places: [],
         urls: [],
       },
-      reminder_at: '2026-03-29T19:00:00',
+      reminder_at: '2026-03-29T19:00:00-05:00',
       confidence: 0.93,
     });
     embedText.mockResolvedValue([0.1, 0.2, 0.3]);
@@ -146,19 +164,25 @@ describe('processItem', () => {
           },
           embedding: '[0.1,0.2,0.3]',
           processed: true,
-          reminder_at: '2026-03-29T19:00:00',
+          reminder_status: 'pending',
+          reminder_at: '2026-03-29T19:00:00-05:00',
         },
       }),
     );
 
     const result = await processItem('item-1');
 
-    expect(classifyItem).toHaveBeenCalledWith(itemRow.raw_input, [
-      'Family reminders matter.',
-    ]);
+    expect(classifyItem).toHaveBeenCalledWith(
+      itemRow.raw_input,
+      ['Family reminders matter.'],
+      {
+        timezone: 'America/Chicago',
+        nowIso: expect.any(String),
+      },
+    );
     expect(embedText).toHaveBeenCalledWith('Call mom tomorrow at 7:00 PM.');
     expect(result.processed).toBe(true);
-    expect(result.reminderAt).toBe('2026-03-29T19:00:00');
+    expect(result.reminderAt).toBe('2026-03-29T19:00:00-05:00');
   });
 
   it('preserves attachment_url while adding AI entities', async () => {

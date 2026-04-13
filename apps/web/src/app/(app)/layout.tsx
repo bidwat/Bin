@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 
 import { Sidebar } from '@/components/Sidebar';
+import { TimezoneSync } from '@/components/TimezoneSync';
 import { WebReminderBridge } from '@/components/WebReminderBridge';
 import { UserProvider } from '@/context/UserContext';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -23,6 +24,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         email: session.user.email ?? null,
       }}
     >
+      <TimezoneSync />
       <WebReminderBridge userId={session.user.id} />
       <main className="min-h-screen px-6 py-8 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">

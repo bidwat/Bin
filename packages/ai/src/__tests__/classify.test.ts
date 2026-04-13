@@ -59,7 +59,7 @@ describe('classifyItem', () => {
                 places: [],
                 urls: [],
               },
-              reminder_at: '2026-03-29T19:00:00',
+              reminder_at: '2026-03-29T19:00:00-05:00',
               confidence: 0.91,
             }),
           },
@@ -70,9 +70,13 @@ describe('classifyItem', () => {
     const result = await classifyItem(
       'remind me to call mom tomorrow at 7pm',
       [],
+      {
+        timezone: 'America/Chicago',
+        nowIso: '2026-03-28T12:00:00.000Z',
+      },
     );
     expect(result.type).toBe('reminder');
-    expect(result.reminder_at).toBe('2026-03-29T19:00:00');
+    expect(result.reminder_at).toBe('2026-03-29T19:00:00-05:00');
   });
 
   it('retries once when the model returns invalid JSON', async () => {
@@ -111,5 +115,40 @@ describe('classifyItem', () => {
     create.mockRejectedValue(new Error('boom'));
 
     await expect(classifyItem('hello', [])).rejects.toBeInstanceOf(AiError);
+  });
+
+  it('includes timezone context in the classification prompt', async () => {
+    create.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              cleaned_text: 'Buy milk.',
+              type: 'task',
+              actionability: 'now',
+              entities: { people: [], dates: [], places: [], urls: [] },
+              reminder_at: null,
+              confidence: 0.95,
+            }),
+          },
+        },
+      ],
+    });
+
+    await classifyItem('buy milk', [], {
+      timezone: 'America/Chicago',
+      nowIso: '2026-04-13T18:00:00.000Z',
+    });
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: 'user',
+            content: expect.stringContaining('User timezone: America/Chicago'),
+          }),
+        ]),
+      }),
+    );
   });
 });

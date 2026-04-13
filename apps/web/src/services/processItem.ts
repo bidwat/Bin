@@ -118,6 +118,20 @@ async function fetchUserMemoryStatements(
   return data.map((entry) => entry.statement);
 }
 
+async function fetchUserProfile(supabase: AdminClient, userId: string) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('timezone, auto_create_reminders')
+    .eq('id', userId)
+    .single();
+
+  if (error || !data) {
+    throw new ProcessItemError('Failed to load user profile', 500);
+  }
+
+  return data;
+}
+
 export async function processItem(itemId: string) {
   const env = getServerEnv();
   const supabase = createAdminSupabaseClient(
@@ -136,9 +150,14 @@ export async function processItem(itemId: string) {
     supabase,
     item.user_id,
   );
+  const userProfile = await fetchUserProfile(supabase, item.user_id);
   const classification = await classifyItem(
     item.raw_input,
     userMemoryStatements,
+    {
+      timezone: userProfile.timezone || 'UTC',
+      nowIso: new Date().toISOString(),
+    },
   );
   console.info('processItem classified item', {
     itemId,
@@ -167,6 +186,10 @@ export async function processItem(itemId: string) {
     embedding: serializeEmbedding(embedding),
     processed: true,
     reminder_at: classification.reminder_at,
+    reminder_status:
+      classification.reminder_at && userProfile.auto_create_reminders
+        ? 'pending'
+        : null,
   };
 
   const { data, error } = await supabase

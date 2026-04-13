@@ -15,17 +15,28 @@ export const classificationSchema = z.object({
     places: z.array(z.string()),
     urls: z.array(z.string()),
   }),
-  reminder_at: z.string().nullable(),
+  reminder_at: z.string().datetime({ offset: true }).nullable(),
   confidence: z.number().min(0).max(1),
 });
 
 export type ClassificationResult = z.infer<typeof classificationSchema>;
 
-function buildMessages(rawInput: string, userMemory: string[], retry = false) {
+type ClassificationContext = {
+  timezone: string;
+  nowIso: string;
+};
+
+function buildMessages(
+  rawInput: string,
+  userMemory: string[],
+  context: ClassificationContext,
+  retry = false,
+) {
   const memoryBlock =
     userMemory.length > 0
       ? `User memory:\n- ${userMemory.join('\n- ')}`
       : 'User memory: none';
+  const timeContext = `Time context:\n- User timezone: ${context.timezone}\n- Current timestamp: ${context.nowIso}`;
 
   return [
     {
@@ -34,7 +45,7 @@ function buildMessages(rawInput: string, userMemory: string[], retry = false) {
     },
     {
       role: 'user' as const,
-      content: `${memoryBlock}\n\nRaw input:\n${rawInput}`,
+      content: `${memoryBlock}\n\n${timeContext}\n\nRaw input:\n${rawInput}`,
     },
     ...(retry
       ? [
@@ -53,7 +64,14 @@ function parseClassification(content: string) {
   return classificationSchema.parse(parsedJson);
 }
 
-export async function classifyItem(rawInput: string, userMemory: string[]) {
+export async function classifyItem(
+  rawInput: string,
+  userMemory: string[],
+  context: ClassificationContext = {
+    timezone: 'UTC',
+    nowIso: new Date().toISOString(),
+  },
+) {
   const client = getOpenAIClient();
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -61,7 +79,7 @@ export async function classifyItem(rawInput: string, userMemory: string[]) {
       const response = await client.chat.completions.create({
         model: 'gpt-5-nano',
         response_format: { type: 'json_object' },
-        messages: buildMessages(rawInput, userMemory, attempt > 0),
+        messages: buildMessages(rawInput, userMemory, context, attempt > 0),
       });
 
       const content = response.choices[0]?.message?.content;
