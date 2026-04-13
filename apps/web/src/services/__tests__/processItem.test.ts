@@ -29,13 +29,12 @@ function createAdminClient({
   updatedRow,
   userRow = {
     timezone: 'America/Chicago',
-    auto_create_reminders: true,
   },
 }: {
   itemRow: Record<string, unknown>;
   memoryRows?: Array<{ statement: string }>;
   updatedRow?: Record<string, unknown>;
-  userRow?: { timezone: string; auto_create_reminders: boolean };
+  userRow?: { timezone: string };
 }) {
   const itemsSelectSingle = vi.fn(async () => ({ data: itemRow, error: null }));
   const memoryLimit = vi.fn(async () => ({ data: memoryRows, error: null }));

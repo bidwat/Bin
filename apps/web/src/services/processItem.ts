@@ -121,7 +121,7 @@ async function fetchUserMemoryStatements(
 async function fetchUserProfile(supabase: AdminClient, userId: string) {
   const { data, error } = await supabase
     .from('users')
-    .select('timezone, auto_create_reminders')
+    .select('timezone')
     .eq('id', userId)
     .single();
 
@@ -186,10 +186,7 @@ export async function processItem(itemId: string) {
     embedding: serializeEmbedding(embedding),
     processed: true,
     reminder_at: classification.reminder_at,
-    reminder_status:
-      classification.reminder_at && userProfile.auto_create_reminders
-        ? 'pending'
-        : null,
+    reminder_status: classification.reminder_at ? 'pending' : null,
   };
 
   const { data, error } = await supabase

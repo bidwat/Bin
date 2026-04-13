@@ -52,8 +52,8 @@ describe('reminders cron route', () => {
         if (table === 'items') {
           return {
             select: vi.fn(() => ({
-              in: vi.fn(() => ({
-                not: vi.fn(() => ({
+              not: vi.fn(() => ({
+                or: vi.fn(() => ({
                   lte: vi.fn(() => ({
                     gt: vi.fn(async () => ({
                       data: [

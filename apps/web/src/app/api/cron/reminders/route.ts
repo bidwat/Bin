@@ -32,8 +32,10 @@ export async function POST(request: Request) {
   const { data: itemRows, error: itemsError } = await admin
     .from('items')
     .select('*')
-    .in('reminder_status', ['pending', 'snoozed'])
     .not('reminder_at', 'is', null)
+    .or(
+      'reminder_status.eq.pending,reminder_status.eq.snoozed,reminder_status.is.null',
+    )
     .lte('reminder_at', now)
     .gt('reminder_at', windowStart);
 
