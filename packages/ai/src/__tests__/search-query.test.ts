@@ -30,6 +30,7 @@ describe('understandSearchQuery', () => {
             content: JSON.stringify({
               normalized_query: 'buy milk',
               search_phrases: ['buy milk', 'milk', 'purchase milk'],
+              concepts: ['buy', 'shopping'],
             }),
           },
         },
@@ -56,6 +57,7 @@ describe('understandSearchQuery', () => {
               content: JSON.stringify({
                 normalized_query: 'purchasing something',
                 search_phrases: ['purchase', 'buy something'],
+                concepts: ['buy', 'purchase'],
               }),
             },
           },

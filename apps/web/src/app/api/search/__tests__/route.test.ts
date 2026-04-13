@@ -90,6 +90,7 @@ describe('search route', () => {
     understandSearchQuery.mockResolvedValue({
       normalized_query: 'milk',
       search_phrases: ['milk'],
+      concepts: [],
     });
     getServerEnv.mockReturnValue({
       supabaseUrl: 'https://supabase.example',
@@ -254,6 +255,7 @@ describe('search route', () => {
     understandSearchQuery.mockResolvedValue({
       normalized_query: 'purchase milk',
       search_phrases: ['buy milk', 'milk'],
+      concepts: ['shopping', 'buy'],
     });
     embedText.mockResolvedValue([0.1, 0.2, 0.3]);
     const row = {
@@ -306,10 +308,11 @@ describe('search route', () => {
     expect(embedText).toHaveBeenCalledWith('purchase milk');
     expect(embedText).toHaveBeenCalledWith('buy milk');
     expect(embedText).toHaveBeenCalledWith('milk');
+    expect(embedText).toHaveBeenCalledWith('shopping');
     expect(payload.results[0]?.item.rawInput).toBe('Buy milk tonight');
   });
 
-  it('falls back to the raw query when query understanding fails', async () => {
+  it('falls back to the raw query plus heuristic variants when query understanding fails', async () => {
     understandSearchQuery.mockRejectedValue(new Error('openai down'));
     embedText.mockResolvedValue([0.1, 0.2, 0.3]);
     createAdminSupabaseClient.mockReturnValue(createSearchClient({}));
@@ -326,7 +329,32 @@ describe('search route', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(embedText).toHaveBeenCalledTimes(1);
+    expect(embedText).toHaveBeenCalledTimes(5);
     expect(embedText).toHaveBeenCalledWith('buy milk');
+    expect(embedText).toHaveBeenCalledWith('shopping');
+  });
+
+  it('derives heuristic purchase-related concepts from broad natural language queries', async () => {
+    understandSearchQuery.mockRejectedValue(new Error('openai down'));
+    embedText.mockResolvedValue([0.1, 0.2, 0.3]);
+    createAdminSupabaseClient.mockReturnValue(createSearchClient({}));
+    getAuthenticatedRouteContext.mockResolvedValue({
+      user: { id: 'user-1', email: 'a@example.com' },
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/search', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: 'find me items where i talk about purchasing stuff',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(embedText).toHaveBeenCalledWith('purchase');
+    expect(embedText).toHaveBeenCalledWith('buy');
+    expect(embedText).toHaveBeenCalledWith('shopping');
   });
 });

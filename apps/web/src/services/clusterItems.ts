@@ -12,6 +12,7 @@ type ClusterInsert = Database['public']['Tables']['clusters']['Insert'];
 type VectorItem = {
   id: string;
   type: ItemTypeValue;
+  actionability: Database['public']['Enums']['actionability'] | null;
   text: string;
   vector: number[];
 };
@@ -137,6 +138,26 @@ function chooseInitialCentroids(points: VectorItem[], count: number) {
   }
 
   return centroids;
+}
+
+function getDominantTypeScope(points: VectorItem[]) {
+  const counts = new Map<ItemTypeValue, number>();
+
+  for (const point of points) {
+    counts.set(point.type, (counts.get(point.type) ?? 0) + 1);
+  }
+
+  let winner: ItemTypeValue | null = null;
+  let winnerCount = 0;
+
+  for (const [type, count] of counts.entries()) {
+    if (count > winnerCount) {
+      winner = type;
+      winnerCount = count;
+    }
+  }
+
+  return winner;
 }
 
 function clusterPoints(points: VectorItem[], requestedCount: number) {
@@ -306,6 +327,7 @@ async function fetchEmbeddableItems(supabase: SupabaseClient, userId: string) {
       return {
         id: row.id,
         type: row.type as ItemTypeValue,
+        actionability: row.actionability,
         text: row.cleaned_text?.trim() || row.raw_input,
         vector,
       } satisfies VectorItem;
@@ -434,35 +456,23 @@ export async function clusterItemsForUser(
     };
   }
 
-  const groupedByType = new Map<ItemTypeValue, VectorItem[]>();
-
-  for (const item of items) {
-    const group = groupedByType.get(item.type) ?? [];
-    group.push(item);
-    groupedByType.set(item.type, group);
-  }
-
   const clusterRows: ClusterInsert[] = [];
   const itemAssignments = new Map<string, ItemAssignment>();
   let collectionCount = 0;
   let subclusterCount = 0;
+  const topLevelTypeScope = getDominantTypeScope(items) ?? items[0]!.type;
+  const topLevelClusters = await buildClusters(
+    items,
+    topLevelTypeScope,
+    0,
+    null,
+    labelClusterFn,
+  );
 
-  for (const [typeScope, typedItems] of groupedByType.entries()) {
-    const topLevelClusters = await buildClusters(
-      typedItems,
-      typeScope,
-      0,
-      null,
-      labelClusterFn,
-    );
-
-    if (topLevelClusters.length === 0) {
-      continue;
-    }
-
+  if (topLevelClusters.length > 0) {
     collectionCount += topLevelClusters.length;
 
-    for (const item of typedItems) {
+    for (const item of items) {
       const memberships = determineTopLevelMembership(item, topLevelClusters);
 
       for (const clusterId of memberships) {
@@ -481,14 +491,15 @@ export async function clusterItemsForUser(
         member_count: cluster.memberIds.length,
       });
 
-      const members = typedItems.filter((item) =>
+      const members = items.filter((item) =>
         cluster.memberIds.includes(item.id),
       );
       const beforeCount = clusterRows.length;
+      const childTypeScope = getDominantTypeScope(members) ?? cluster.typeScope;
 
       await buildClusterTree(
         members,
-        typeScope,
+        childTypeScope,
         1,
         cluster.id,
         clusterRows,

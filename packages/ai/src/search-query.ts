@@ -2,30 +2,15 @@ import { z } from 'zod';
 
 import { getOpenAIClient } from './client';
 import { AiError } from './errors';
+import { SEARCH_QUERY_PROMPT } from './prompts/search-query';
 
 const searchQuerySchema = z.object({
   normalized_query: z.string().trim().min(1),
-  search_phrases: z.array(z.string().trim().min(1)).max(5),
+  search_phrases: z.array(z.string().trim().min(1)).max(6),
+  concepts: z.array(z.string().trim().min(1)).max(6).default([]),
 });
 
 export type SearchQueryUnderstanding = z.infer<typeof searchQuerySchema>;
-
-const SEARCH_QUERY_PROMPT = `You rewrite natural-language search requests for a personal notes app.
-
-Return only JSON with this shape:
-{
-  "normalized_query": string,
-  "search_phrases": string[]
-}
-
-Rules:
-1. Preserve the user's underlying intent, topic, and important entities.
-2. Remove conversational filler like "is there a note where I talk about".
-3. Make normalized_query a compact semantic query phrase, not a full sentence.
-4. search_phrases should contain 1-5 short phrases that would help both semantic and keyword search.
-5. Include exact nouns and likely alternate phrasings when useful.
-6. Do not invent facts not implied by the query.
-7. Return valid JSON only.`;
 
 function buildMessages(rawQuery: string, retry = false) {
   return [

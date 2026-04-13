@@ -16,7 +16,7 @@ type MatchRow = {
   similarity: number;
 };
 
-const SEARCH_MATCH_THRESHOLD = 0.55;
+const SEARCH_MATCH_THRESHOLD = 0.42;
 
 function escapeIlike(input: string) {
   return input.replace(/[%_,]/g, ' ').trim();
@@ -26,16 +26,50 @@ function dedupeQueries(queries: string[]) {
   return [...new Set(queries.map((query) => query.trim()).filter(Boolean))];
 }
 
+function deriveHeuristicSearchQueries(query: string) {
+  const normalized = query
+    .toLowerCase()
+    .replace(
+      /\b(find|show|pull up|get|me|items|item|notes|note|where|that|i|talk|about|my|the|a|an)\b/g,
+      ' ',
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) {
+    return [];
+  }
+
+  const phraseVariants = [normalized]
+    .map((value) => value.replace(/\bbuying\b/g, 'buy'))
+    .map((value) => value.replace(/\bpurchasing\b/g, 'purchase'))
+    .map((value) => value.replace(/\bthings\b/g, ''))
+    .map((value) => value.replace(/\bstuff\b/g, ''))
+    .map((value) => value.replace(/\s+/g, ' ').trim());
+
+  const conceptVariants: string[] = [];
+
+  if (/\bpurchas|buy|shopping|shop\b/.test(normalized)) {
+    conceptVariants.push('buy', 'purchase', 'shopping', 'errands');
+  }
+
+  return dedupeQueries([...phraseVariants, ...conceptVariants]);
+}
+
 async function buildSearchQueries(query: string) {
+  const heuristicQueries = deriveHeuristicSearchQueries(query);
+
   try {
     const understood = await understandSearchQuery(query);
     return dedupeQueries([
       query,
+      ...heuristicQueries,
       understood.normalized_query,
       ...understood.search_phrases,
+      ...understood.concepts,
     ]);
   } catch {
-    return [query];
+    return dedupeQueries([query, ...heuristicQueries]);
   }
 }
 

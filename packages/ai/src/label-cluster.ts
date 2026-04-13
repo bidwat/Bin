@@ -2,6 +2,7 @@ import { ItemType } from '@bin/shared';
 
 import { getOpenAIClient } from './client';
 import { AiError } from './errors';
+import { LABEL_CLUSTER_PROMPT } from './prompts/label-cluster';
 
 function scopeLabel(typeScope: ItemType | null | undefined) {
   return typeScope ? `Type scope: ${typeScope}` : 'Type scope: mixed';
@@ -18,15 +19,7 @@ export async function labelCluster(
       messages: [
         {
           role: 'system',
-          content: `You generate short, human-readable labels for clusters in a personal notes app.
-
-Return plain text only.
-Rules:
-1. Write 2 to 5 words.
-2. Be concrete and thematic, not generic.
-3. Do not include quotation marks, numbering, or punctuation unless required.
-4. Prefer labels a human would naturally use as a folder name.
-5. This label is for a ${level}.`,
+          content: `${LABEL_CLUSTER_PROMPT}\n5. This label is for a ${level}.`,
         },
         {
           role: 'user',
