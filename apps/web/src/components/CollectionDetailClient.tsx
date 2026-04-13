@@ -76,9 +76,37 @@ export function CollectionDetailClient({
           Collections
         </Link>
         {breadcrumbs.length > 1 ? (
-          <p className="text-sm text-slate-500">
-            {breadcrumbs.map((entry) => entry.label).join(' / ')}
-          </p>
+          <nav
+            aria-label="Collection breadcrumb"
+            className="text-sm text-slate-500"
+          >
+            {breadcrumbs.map((entry, index) => {
+              const isCurrent = index === breadcrumbs.length - 1;
+
+              return (
+                <span key={entry.id}>
+                  {index > 0 ? (
+                    <span className="mx-2 text-slate-400">/</span>
+                  ) : null}
+                  {isCurrent ? (
+                    <span
+                      aria-current="page"
+                      className="font-medium text-slate-700"
+                    >
+                      {entry.label}
+                    </span>
+                  ) : (
+                    <Link
+                      href={`/collections/${entry.id}`}
+                      className="transition-colors hover:text-slate-900"
+                    >
+                      {entry.label}
+                    </Link>
+                  )}
+                </span>
+              );
+            })}
+          </nav>
         ) : null}
         <div className="flex flex-col gap-3 rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] md:flex-row md:items-end md:justify-between">
           <div className="flex-1 space-y-2">
