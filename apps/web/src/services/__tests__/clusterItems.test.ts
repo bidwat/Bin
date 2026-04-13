@@ -205,6 +205,16 @@ describe('clusterItemsForUser', () => {
         (cluster) => cluster.parent_cluster_id !== null,
       ),
     ).toBe(true);
+    const topLevelClusterIds = new Set(
+      fakeSupabase.state.clusters
+        .filter((cluster) => !cluster.parent_cluster_id)
+        .map((cluster) => cluster.id),
+    );
+    expect(
+      fakeSupabase.state.items.every((item) =>
+        item.cluster_ids.some((clusterId) => topLevelClusterIds.has(clusterId)),
+      ),
+    ).toBe(true);
     expect(
       fakeSupabase.state.clusters.every((cluster) =>
         ['Top Cluster', 'Sub Cluster'].includes(cluster.label),

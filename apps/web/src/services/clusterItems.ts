@@ -286,6 +286,10 @@ function determineTopLevelMembership(
   item: VectorItem,
   clusters: BuiltCluster[],
 ) {
+  if (clusters.length === 0) {
+    return [];
+  }
+
   const similarities = clusters
     .map((cluster) => ({
       id: cluster.id,
@@ -293,14 +297,22 @@ function determineTopLevelMembership(
     }))
     .sort((left, right) => right.similarity - left.similarity);
 
+  const primaryClusterId = similarities[0]?.id;
   const primary = similarities[0]?.similarity ?? 0;
-
-  return similarities
+  const additionalClusterIds = similarities
+    .slice(1)
     .filter(
       (entry) => entry.similarity >= 0.72 && primary - entry.similarity <= 0.08,
     )
-    .slice(0, 3)
+    .slice(0, 2)
     .map((entry) => entry.id);
+
+  // Always include a primary top-level cluster so collections are reachable.
+  if (!primaryClusterId) {
+    return additionalClusterIds;
+  }
+
+  return [primaryClusterId, ...additionalClusterIds];
 }
 
 async function fetchEmbeddableItems(supabase: SupabaseClient, userId: string) {
