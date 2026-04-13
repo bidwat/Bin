@@ -1,10 +1,14 @@
-import { Actionability, ItemType } from '@bin/shared';
+import { Actionability, ItemType, ReminderStatus } from '@bin/shared';
 import { z } from 'zod';
 
 const itemTypeValues = Object.values(ItemType) as [ItemType, ...ItemType[]];
 const actionabilityValues = Object.values(Actionability) as [
   Actionability,
   ...Actionability[],
+];
+const reminderStatusValues = Object.values(ReminderStatus) as [
+  ReminderStatus,
+  ...ReminderStatus[],
 ];
 
 export const createItemSchema = z
@@ -37,10 +41,21 @@ export const updateItemSchema = z
     type: z.enum(itemTypeValues).nullable().optional(),
     actionability: z.enum(actionabilityValues).nullable().optional(),
     reminder_at: z.string().datetime({ offset: true }).nullable().optional(),
+    reminder_status: z.enum(reminderStatusValues).nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field is required',
   });
+
+export const snoozeReminderSchema = z.object({
+  snooze_minutes: z.union([
+    z.literal(15),
+    z.literal(30),
+    z.literal(60),
+    z.literal(120),
+    z.literal(1440),
+  ]),
+});
 
 export const updateProfileSchema = z
   .object({

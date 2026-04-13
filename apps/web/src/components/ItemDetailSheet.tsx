@@ -1,5 +1,6 @@
 'use client';
 
+import { format } from 'date-fns';
 import { useState } from 'react';
 
 import { Actionability, ItemType, type Item } from '@bin/shared';
@@ -26,6 +27,7 @@ export function ItemDetailSheet({
     item.actionability ?? null,
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingReminder, setIsUpdatingReminder] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
@@ -57,6 +59,62 @@ export function ItemDetailSheet({
     const payload = (await response.json()) as { item: Item };
     onSave(payload.item);
     onClose();
+  }
+
+  async function handleDismissReminder() {
+    setIsUpdatingReminder(true);
+    setError(null);
+
+    const response = await fetch(`/api/items/${item.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        reminder_status: 'dismissed',
+      }),
+    });
+
+    setIsUpdatingReminder(false);
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setError(payload?.error ?? 'Unable to dismiss reminder');
+      return;
+    }
+
+    const payload = (await response.json()) as { item: Item };
+    onSave(payload.item);
+  }
+
+  async function handleSnoozeReminder(minutes: 15 | 60 | 1440) {
+    setIsUpdatingReminder(true);
+    setError(null);
+
+    const response = await fetch(`/api/items/${item.id}/snooze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        snooze_minutes: minutes,
+      }),
+    });
+
+    setIsUpdatingReminder(false);
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setError(payload?.error ?? 'Unable to snooze reminder');
+      return;
+    }
+
+    const payload = (await response.json()) as { item: Item };
+    onSave(payload.item);
   }
 
   return (
@@ -103,6 +161,47 @@ export function ItemDetailSheet({
               {item.rawInput}
             </p>
           </section>
+
+          {item.reminderAt ? (
+            <section className="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-700">
+                Reminder
+              </p>
+              <p className="mt-3 text-sm text-amber-900">
+                Due {format(new Date(item.reminderAt), 'MMM d, yyyy h:mm a')}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleSnoozeReminder(15)}
+                  className="rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-950"
+                >
+                  15 min
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSnoozeReminder(60)}
+                  className="rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-950"
+                >
+                  1 hour
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSnoozeReminder(1440)}
+                  className="rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-950"
+                >
+                  Tomorrow
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDismissReminder()}
+                  className="rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+                >
+                  {isUpdatingReminder ? 'Working...' : 'Dismiss'}
+                </button>
+              </div>
+            </section>
+          ) : null}
 
           <label className="block space-y-3">
             <span className="text-sm font-medium text-slate-700">

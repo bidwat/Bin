@@ -1,4 +1,9 @@
-import { type Actionability, type Cluster, type Item } from '@bin/shared';
+import {
+  ReminderStatus,
+  type Actionability,
+  type Cluster,
+  type Item,
+} from '@bin/shared';
 import type { Database } from '@bin/supabase';
 import { Platform } from 'react-native';
 
@@ -382,7 +387,10 @@ export async function fetchItem(id: string) {
 export async function updateItem(
   id: string,
   updates: Partial<
-    Pick<Item, 'cleanedText' | 'type' | 'actionability' | 'reminderAt'>
+    Pick<
+      Item,
+      'cleanedText' | 'type' | 'actionability' | 'reminderAt' | 'reminderStatus'
+    >
   >,
 ) {
   assertUuid(id);
@@ -401,6 +409,9 @@ export async function updateItem(
   if ('reminderAt' in updates) {
     payload.reminder_at = updates.reminderAt ?? null;
   }
+  if ('reminderStatus' in updates) {
+    payload.reminder_status = updates.reminderStatus ?? null;
+  }
 
   const { data, error } = await supabase
     .from('items')
@@ -415,6 +426,44 @@ export async function updateItem(
   }
 
   return { item: mapItemRow(data) };
+}
+
+export async function snoozeReminder(
+  id: string,
+  snoozeMinutes: 15 | 30 | 60 | 120 | 1440,
+) {
+  assertUuid(id);
+
+  const response = await fetch(
+    `${getMobileEnv().apiBaseUrl}/api/items/${id}/snooze`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(await getAuthHeaders()),
+      },
+      body: JSON.stringify({ snooze_minutes: snoozeMinutes }),
+    },
+  );
+
+  const payload = (await response.json().catch(() => null)) as {
+    item?: Item;
+    error?: string;
+  } | null;
+
+  if (!response.ok || !payload?.item) {
+    throw new Error(payload?.error ?? 'Failed to snooze reminder');
+  }
+
+  return payload.item;
+}
+
+export async function dismissReminder(id: string) {
+  const { item } = await updateItem(id, {
+    reminderStatus: ReminderStatus.Dismissed,
+  });
+
+  return item;
 }
 
 export async function fetchProfile() {

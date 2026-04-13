@@ -8,10 +8,11 @@
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.yourcompany.bin",
-      "permissions": ["RECORD_AUDIO", "CAMERA"]
+      "permissions": ["RECORD_AUDIO", "CAMERA", "POST_NOTIFICATIONS"]
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-av",
         {

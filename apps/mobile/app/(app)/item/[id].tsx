@@ -1,4 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
+import { format } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
@@ -12,7 +13,12 @@ import {
 
 import { Actionability, ItemType, type Item } from '@bin/shared';
 
-import { fetchItem, updateItem } from '../../../src/lib/api';
+import {
+  dismissReminder,
+  fetchItem,
+  snoozeReminder,
+  updateItem,
+} from '../../../src/lib/api';
 import { getAttachmentUrl } from '../../../src/lib/attachments';
 
 export default function ItemDetailScreen() {
@@ -24,6 +30,7 @@ export default function ItemDetailScreen() {
   const [actionability, setActionability] =
     useState<Item['actionability']>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingReminder, setIsUpdatingReminder] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const attachmentUrl = item
     ? getAttachmentUrl(item.entities.attachment_url)
@@ -75,6 +82,46 @@ export default function ItemDetailScreen() {
     }
   }
 
+  async function handleDismissReminder() {
+    if (!item) {
+      return;
+    }
+
+    setIsUpdatingReminder(true);
+    setError(null);
+
+    try {
+      const updatedItem = await dismissReminder(item.id);
+      setItem(updatedItem);
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error ? nextError.message : 'Unable to dismiss',
+      );
+    } finally {
+      setIsUpdatingReminder(false);
+    }
+  }
+
+  async function handleSnoozeReminder(minutes: 15 | 60 | 1440) {
+    if (!item) {
+      return;
+    }
+
+    setIsUpdatingReminder(true);
+    setError(null);
+
+    try {
+      const updatedItem = await snoozeReminder(item.id, minutes);
+      setItem(updatedItem);
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error ? nextError.message : 'Unable to snooze',
+      );
+    } finally {
+      setIsUpdatingReminder(false);
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.eyebrow}>Item</Text>
@@ -93,6 +140,37 @@ export default function ItemDetailScreen() {
         ) : null}
         <Text style={styles.body}>{item?.rawInput ?? 'Loading...'}</Text>
       </View>
+
+      {item?.reminderAt ? (
+        <View style={styles.reminderCard}>
+          <Text style={styles.cardTitle}>Reminder</Text>
+          <Text style={styles.reminderMeta}>
+            Due {format(new Date(item.reminderAt), 'MMM d, yyyy h:mm a')}
+          </Text>
+          <View style={styles.reminderActions}>
+            <Pill
+              active={false}
+              label="15 min"
+              onPress={() => void handleSnoozeReminder(15)}
+            />
+            <Pill
+              active={false}
+              label="1 hour"
+              onPress={() => void handleSnoozeReminder(60)}
+            />
+            <Pill
+              active={false}
+              label="Tomorrow"
+              onPress={() => void handleSnoozeReminder(1440)}
+            />
+            <Pill
+              active={false}
+              label={isUpdatingReminder ? 'Working...' : 'Dismiss'}
+              onPress={() => void handleDismissReminder()}
+            />
+          </View>
+        </View>
+      ) : null}
 
       <Text style={styles.label}>Cleaned text</Text>
       <TextInput
@@ -207,6 +285,23 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     marginTop: 12,
+  },
+  reminderCard: {
+    backgroundColor: '#fff7ed',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#fdba74',
+  },
+  reminderMeta: {
+    color: '#9a3412',
+    marginTop: 8,
+  },
+  reminderActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 16,
   },
   cardTitle: {
     color: '#0f172a',

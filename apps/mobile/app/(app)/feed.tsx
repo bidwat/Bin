@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -9,21 +10,31 @@ import {
   View,
 } from 'react-native';
 
-import { Actionability, ItemType, type Cluster, type Item } from '@bin/shared';
+import {
+  Actionability,
+  ItemType,
+  ReminderStatus,
+  type Cluster,
+  type Item,
+} from '@bin/shared';
 
 import { CollectionCard } from '../../src/components/CollectionCard';
 import { CaptureBar } from '../../src/components/CaptureBar';
 import { FeedFilterDrawer } from '../../src/components/FeedFilterDrawer';
 import { ItemCard } from '../../src/components/ItemCard';
+import { ReminderBanner } from '../../src/components/ReminderBanner';
 import {
   createItem,
+  dismissReminder,
   deleteItem,
   fetchCollections,
   fetchItems,
+  snoozeReminder,
 } from '../../src/lib/api';
 import { supabase } from '../../src/lib/supabase';
 
 export default function FeedScreen() {
+  const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
   const [collections, setCollections] = useState<Cluster[]>([]);
   const [selectedType, setSelectedType] = useState<ItemType | null>(null);
@@ -32,6 +43,7 @@ export default function FeedScreen() {
   const [selectedCollectionId, setSelectedCollectionId] = useState<
     string | null
   >(null);
+  const [activeReminder, setActiveReminder] = useState<Item | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -97,9 +109,89 @@ export default function FeedScreen() {
       .channel('mobile-items')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'items' },
+        { event: 'INSERT', schema: 'public', table: 'items' },
         () => {
           void loadItems();
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'items' },
+        () => {
+          void loadItems();
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'items' },
+        (payload) => {
+          void loadItems();
+
+          const nextReminderStatus =
+            typeof payload.new.reminder_status === 'string'
+              ? payload.new.reminder_status
+              : null;
+          const previousReminderStatus =
+            typeof payload.old.reminder_status === 'string'
+              ? payload.old.reminder_status
+              : null;
+
+          if (
+            nextReminderStatus === ReminderStatus.Sent &&
+            previousReminderStatus !== ReminderStatus.Sent
+          ) {
+            const nextItem = {
+              id: String(payload.new.id),
+              userId: String(payload.new.user_id),
+              rawInput: String(payload.new.raw_input),
+              cleanedText:
+                typeof payload.new.cleaned_text === 'string'
+                  ? payload.new.cleaned_text
+                  : null,
+              source: String(payload.new.source ?? 'manual'),
+              type:
+                typeof payload.new.type === 'string'
+                  ? (payload.new.type as Item['type'])
+                  : null,
+              actionability:
+                typeof payload.new.actionability === 'string'
+                  ? (payload.new.actionability as Item['actionability'])
+                  : null,
+              entities:
+                payload.new.entities &&
+                typeof payload.new.entities === 'object' &&
+                !Array.isArray(payload.new.entities)
+                  ? (payload.new.entities as Item['entities'])
+                  : {},
+              clusterIds: Array.isArray(payload.new.cluster_ids)
+                ? payload.new.cluster_ids.map(String)
+                : [],
+              subClusterId:
+                typeof payload.new.sub_cluster_id === 'string'
+                  ? payload.new.sub_cluster_id
+                  : null,
+              resurfacingScore:
+                typeof payload.new.resurfacing_score === 'number'
+                  ? payload.new.resurfacing_score
+                  : 1,
+              processed: Boolean(payload.new.processed),
+              reminderStatus: ReminderStatus.Sent,
+              reminderAt:
+                typeof payload.new.reminder_at === 'string'
+                  ? payload.new.reminder_at
+                  : null,
+              createdAt:
+                typeof payload.new.created_at === 'string'
+                  ? payload.new.created_at
+                  : new Date().toISOString(),
+              lastSurfacedAt:
+                typeof payload.new.last_surfaced_at === 'string'
+                  ? payload.new.last_surfaced_at
+                  : null,
+            } satisfies Item;
+
+            setActiveReminder(nextItem);
+          }
         },
       )
       .subscribe();
@@ -111,6 +203,44 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
+      {activeReminder ? (
+        <ReminderBanner
+          item={activeReminder}
+          onOpen={() => {
+            router.push({
+              pathname: '/(app)/item/[id]',
+              params: { id: activeReminder.id },
+            });
+            setActiveReminder(null);
+          }}
+          onDismiss={() => {
+            void dismissReminder(activeReminder.id)
+              .then((updatedItem) => {
+                setItems((current) =>
+                  current.map((item) =>
+                    item.id === updatedItem.id ? updatedItem : item,
+                  ),
+                );
+              })
+              .finally(() => {
+                setActiveReminder(null);
+              });
+          }}
+          onSnooze={(minutes) => {
+            void snoozeReminder(activeReminder.id, minutes)
+              .then((updatedItem) => {
+                setItems((current) =>
+                  current.map((item) =>
+                    item.id === updatedItem.id ? updatedItem : item,
+                  ),
+                );
+              })
+              .finally(() => {
+                setActiveReminder(null);
+              });
+          }}
+        />
+      ) : null}
       <FlatList
         data={visibleItems}
         keyExtractor={(item) => item.id}

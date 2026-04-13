@@ -76,6 +76,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
   if ('reminder_at' in payload)
     updates.reminder_at = payload.reminder_at ?? null;
+  if ('reminder_status' in payload)
+    updates.reminder_status = payload.reminder_status ?? null;
 
   const { data, error } = await supabase
     .from('items')
