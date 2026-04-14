@@ -26,7 +26,6 @@ export async function POST(request: Request) {
     env.supabaseUrl,
     env.supabaseSecretKey,
   );
-  const windowStart = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const now = new Date().toISOString();
 
   const { data: itemRows, error: itemsError } = await admin
@@ -37,7 +36,8 @@ export async function POST(request: Request) {
       'reminder_status.eq.pending,reminder_status.eq.snoozed,reminder_status.is.null',
     )
     .lte('reminder_at', now)
-    .gt('reminder_at', windowStart);
+    .order('reminder_at', { ascending: true })
+    .limit(100);
 
   if (itemsError) {
     return jsonResponse(

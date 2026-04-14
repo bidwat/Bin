@@ -55,28 +55,30 @@ describe('reminders cron route', () => {
               not: vi.fn(() => ({
                 or: vi.fn(() => ({
                   lte: vi.fn(() => ({
-                    gt: vi.fn(async () => ({
-                      data: [
-                        {
-                          id: '00000000-0000-4000-8000-000000000001',
-                          user_id: 'user-1',
-                          raw_input: 'Call mom',
-                          cleaned_text: 'Call mom',
-                          source: 'manual',
-                          type: 'reminder',
-                          actionability: 'now',
-                          entities: {},
-                          cluster_ids: [],
-                          sub_cluster_id: null,
-                          resurfacing_score: 1,
-                          processed: true,
-                          reminder_status: 'pending',
-                          reminder_at: '2026-04-13T01:00:00.000Z',
-                          created_at: '2026-04-12T23:00:00.000Z',
-                          last_surfaced_at: null,
-                        },
-                      ],
-                      error: null,
+                    order: vi.fn(() => ({
+                      limit: vi.fn(async () => ({
+                        data: [
+                          {
+                            id: '00000000-0000-4000-8000-000000000001',
+                            user_id: 'user-1',
+                            raw_input: 'Call mom',
+                            cleaned_text: 'Call mom',
+                            source: 'manual',
+                            type: 'reminder',
+                            actionability: 'now',
+                            entities: {},
+                            cluster_ids: [],
+                            sub_cluster_id: null,
+                            resurfacing_score: 1,
+                            processed: true,
+                            reminder_status: 'pending',
+                            reminder_at: '2026-04-13T01:00:00.000Z',
+                            created_at: '2026-04-12T23:00:00.000Z',
+                            last_surfaced_at: null,
+                          },
+                        ],
+                        error: null,
+                      })),
                     })),
                   })),
                 })),
